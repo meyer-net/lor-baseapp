@@ -1,2 +1,2 @@
 # lor-baseapp
-use for lor-project
+Used for lor-project base on openresty。
