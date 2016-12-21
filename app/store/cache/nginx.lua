@@ -96,4 +96,31 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
+-- 获取推送 REDIS 队列长度
+function _obj:llen(key)
+	return self.store:llen(key)
+end
+
+-- 推送 REDIS 缓存值
+function _obj:lpush(key, value)
+    return self.store:lpush(key, value)
+end
+
+-- 推送 REDIS 缓存值
+function _obj:rpush(key, value)
+    return self.store:rpush(key, value)
+end
+
+-- 推出 REDIS 缓存值
+function _obj:lpop(key)
+    return self.store:lpop(key)
+end
+
+-- 推出 REDIS 缓存值
+function _obj:rpop(key)
+    return self.store:rpop(key)
+end
+
+-----------------------------------------------------------------------------------------------------------------
+
 return _obj
