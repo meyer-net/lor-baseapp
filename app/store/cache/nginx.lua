@@ -19,7 +19,7 @@ function _obj:new(conf)
     self._name = "cache-nginx-store"
     self.store = ngx.shared[conf.name]
 
-    _obj.super.new(self, self._name)
+    _obj.super.new(self, conf)
 end
 
 -----------------------------------------------------------------------------------------------------------------

@@ -10,20 +10,18 @@ local s_cache = require("app.store.cache.base_cache")
 
 -----------------------------------------------------------------------------------------------------------------
 
-local _M = s_cache:extend()
+local _obj = s_cache:extend()
 
 ------------------------------------------ 通用配置信息，使它分离出多个区域 -----------------------------------  
 
 --[[
 ---> RDS 选区
 --]]
-function _M:new(conf)
+function _obj:new(conf)
     self._VERSION = '0.02'
     self._name = "cache-redis-store"
-
     self.config = conf
-
-    _M.super.new(self, self._name)
+    _obj.super.new(self, conf)
 end
 
 -----------------------------------------------------------------------------------------------------------------
@@ -33,7 +31,7 @@ end
 --[[
 ---> RDS 连接器
 --]]
-function _M:_get_connect( timeout )
+function _obj:_get_connect( timeout )
 	local config = self.config
 	if timeout then
 		config.timeout = timeout
@@ -43,7 +41,7 @@ function _M:_get_connect( timeout )
 end
 
 -- 设置 REDIS 缓存值
-function _M:set_by_json(json, timeout)
+function _obj:set_by_json(json, timeout)
 	local json_obj = c_json.decode(json)
 
 	-- 获取缓存连接器
@@ -57,7 +55,7 @@ function _M:set_by_json(json, timeout)
 		-- 设置缓存
 		redis:set(key, value)
 
-		timeout = _M.filter_timeout(timeout, function ()
+		timeout = _obj.filter_timeout(timeout, function ()
 			-- 设置当前KEY的过期时间，-s 秒为
 			redis:expire(key, timeout)
 		end)
@@ -73,12 +71,12 @@ function _M:set_by_json(json, timeout)
 end
 
 -- 设置 REDIS 缓存值
-function _M:set(key, value, timeout)
+function _obj:set(key, value, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:set(key, value)
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, timeout)
 	end)
@@ -87,18 +85,18 @@ function _M:set(key, value, timeout)
 end
 
 -- 设置 REDIS 缓存值
-function _M:hmset_by_array_text(key, array_text, timeout)
+function _obj:hmset_by_array_text(key, array_text, timeout)
 	local value = c_json.decode(array_text)
 	return self:hmset(key, value, timeout)
 end
 
 -- 设置 REDIS 缓存值
-function _M:hmset(key, value, timeout)
+function _obj:hmset(key, value, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:hmset(key, unpack(value))
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, timeout)
 	end)
@@ -108,12 +106,12 @@ function _M:hmset(key, value, timeout)
 end
 
 -- 设置 REDIS 缓存值 依据 function
-function _M:set_by_func(key, func, timeout)
+function _obj:set_by_func(key, func, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:set(key, func())
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, timeout)
 	end)
@@ -122,7 +120,7 @@ function _M:set_by_func(key, func, timeout)
 end
 
 -- 获取 REDIS 缓存值
-function _M:get(key)
+function _obj:get(key)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 	local status,value,effect_len = "OK",nil,0
@@ -137,7 +135,7 @@ function _M:get(key)
 end
 
 -- 获取 REDIS 缓存值
-function _M:hmget(key, element_key)
+function _obj:hmget(key, element_key)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 	local status,value,effect_len = "OK",nil,0
@@ -153,19 +151,19 @@ function _M:hmget(key, element_key)
 end
 
 -- 获取 REDIS 缓存值
-function _M:hmget_array_text(key, element_key)
-	local value,err,effect_len,status = _M:hmget(key, element_key)
+function _obj:hmget_array_text(key, element_key)
+	local value,err,effect_len,status = _obj:hmget(key, element_key)
 	return c_json.encode(value),err,effect_len,status
 end
 
-function _M:delete(key)
+function _obj:delete(key)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
-    redis:delete(key)
+    redis:del(key)
 end
 
-function _M:delete_all()
+function _obj:delete_all()
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
@@ -176,12 +174,12 @@ end
 -----------------------------------------------------------------------------------------------------------------
 
 -- 推送 REDIS 缓存值
-function _M:lpush(key, value, timeout)
+function _obj:lpush(key, value, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:lpush(key, value)
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, timeout)
 	end)
@@ -190,7 +188,7 @@ function _M:lpush(key, value, timeout)
 end
 
 -- 推送 REDIS 缓存值
-function _M:llen(key)
+function _obj:llen(key)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
@@ -198,12 +196,12 @@ function _M:llen(key)
 end
 
 -- 推送 REDIS 缓存值
-function _M:rpush(key, value, timeout)
+function _obj:rpush(key, value, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:rpush(key, value)
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, timeout)
 	end)
@@ -212,12 +210,12 @@ function _M:rpush(key, value, timeout)
 end
 
 -- 推送 REDIS 缓存值
-function _M:lpop(key, value, timeout)
+function _obj:lpop(key, value, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:lpop(key, value)
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, timeout)
 	end)
@@ -226,12 +224,12 @@ function _M:lpop(key, value, timeout)
 end
 
 -- 推送 REDIS 缓存值
-function _M:rpop(key, value, timeout)
+function _obj:rpop(key, value, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:rpop(key, value)
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, timeout)
 	end)
@@ -240,12 +238,12 @@ function _M:rpop(key, value, timeout)
 end
 
 -- 设置 REDIS 缓存值
-function _M:incr(key, step, timeout)
+function _obj:incr(key, step, timeout)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
 	local ok,err = redis:incr(key)
-	timeout = _M.filter_timeout(timeout, function ()
+	timeout = _obj.filter_timeout(timeout, function ()
 		-- 设置当前KEY的过期时间，-s 秒为
 		redis:expire(key, step, timeout)
 	end)
@@ -254,7 +252,7 @@ function _M:incr(key, step, timeout)
 end
 
 -- 同一连接，执行命令
-function _M:pipeline_command(action)
+function _obj:pipeline_command(action)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
@@ -265,7 +263,7 @@ function _M:pipeline_command(action)
 	return redis:commit_pipeline()
 end
 
-function _M:keys(pattern)
+function _obj:keys(pattern)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 	
@@ -274,4 +272,4 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-return _M
+return _obj

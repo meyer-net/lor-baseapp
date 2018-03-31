@@ -46,7 +46,7 @@
   local gsub = string.gsub
   local gmatch = string.gmatch or string.gfind
   local find = string.find
-  local ostime = os.time
+  local ostime = ngx.time --os.time
   local osdate = os.date
   local floor = math.floor
   local ceil  = math.ceil

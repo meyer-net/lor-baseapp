@@ -13,6 +13,7 @@ local n_debug = ngx.DEBUG
 
 local u_loader = require("app.utils.loader")
 local u_each = require("app.utils.each")
+local u_table = require("app.utils.table")
 local u_string = require("app.utils.string")
 
 -------------------------------------------------- Plugins -------------------------------------------------
@@ -70,73 +71,124 @@ function _M.init(options)
     options = options or {}
     local store, config
     local status, err = pcall(function()
-        local conf_file_path = options.config
+        config = u_loader.load_config(options.config)
 
-        config = u_loader.load_config(conf_file_path)
+        local db_mode = config.store["db_mode"] or 'normal'
 
-        local db_store = require("app.store."..config.store.db.."_store")(config.store["db_"..config.store.db])
-
-        store = {
-            db = db_store,
-            cache = { }
+        ctx_store = {
+            db = { },
+            cache = { },
+            buffer = { }
         }
 
-        local using_cache = config.store.cache
-        local cache_adapter = require("app.store.cache_adapter")
-        local cache_store = require("app.store.cache_store")
+        -- 加载已声明的DB配置信息
+        local db_configs = config.store["db_configs"]
+        local config_module = db_configs["config_module"] or {}
 
-        -- 存储对象遍历
-        u_each.json_action(config.store, function ( k, v )
-            -- 加载所有已声明的缓存信息，例如：cache_nginx
-            if u_string.starts_with(k, "cache_") then
-                local cache_node = config.store[k]
-                local cache_type = s_gsub(k, "cache_", "")
+        -- 填充DB操作模式
+        local switch_db_namespace = ("app.store."..db_mode..".adapter")
+        u_each.json_action(db_configs, function ( k, v )
+            -- 检测是否为配置节点
+            if u_string.ends_with(k, "_config") then
+                -- 将配置加载至节点
+                local db_config = u_table.clone(config_module)
+                db_config["driver"] = config.store.db_driver
+                db_config["timeout"] = db_configs.timeout
 
-                -- 对象初始化，例如 cache.nginx，cache.redis
-                local cache_group = {}
+                u_each.json_action(v, function ( key, value )
+                        -- 属性新增或覆盖
+                        db_config[key] = value
+                    end)
 
-                -- 填充缓存分组对象
-                local fill_cache_group = function ( node, cfg )
-                    local options = {
-                        name = node,
-                        cache_type = cache_type,
-                        locker_name = config.store.locker_name,
-                        config = cfg
-                    }
-
-                    cache_group[node] = cache_store(options)
-                end
-
-                -- 缓存配置解析填充器
-                local switch = {
-                    ['nginx'] = function()    -- for case nginx
-                        u_each.array_action(cache_node, function ( _, item )
-                                fill_cache_group(item, { name = item })
-                            end)
-                    end,
-                    ['redis'] = function()    -- for case redis
-                        u_each.json_action(cache_node, function ( node, cfg )
-                                fill_cache_group(node, cfg)
-                            end)
-
-                    end
-                }
-
-                -- 执行当前配置逻辑
-                switch[cache_type]()
-
-                store.cache[cache_type] = cache_group
+                -- 添加到加载后的对象
+                local db_key = s_gsub(k, "_config", "")
+                ctx_store.db[db_key] = require(switch_db_namespace)(db_config):open()
             end
         end)
 
-        local tmp_array = u_string.split_gsub(using_cache, ".")
-        local cache_type = tmp_array[1]
-        local cache_node = tmp_array[2] or "default"
+        -- 设置默认
+        local default_db = ctx_store.db["default"]
+        if not default_db then
+            ctx_store.db[""] = default_db
+        else
+            ctx_store.db[""] = ctx_store.db[1]
+        end
 
-        -- store.cache.using.cache.config.port
-        store.cache.using = store.cache[cache_type][cache_node]
+        local fill_ram_lib_dict = function (store_group, ram_type, ram_type_config)
+            -- 获取store
+            local ram_store_lib = require("app.store."..store_group.."_store")
 
-        loaded_plugins = load_plugins_handler(config, store)
+            -- 执行当前配置逻辑
+            if not u_table.contains(ram_store_lib.support_types, ram_type) then
+                return nil
+            end
+            
+            -- 对象初始化，例如 ram.nginx，ram.redis，ram.kafka
+            ctx_store[store_group][ram_type] = { }
+
+            -- 填充缓存分组对象
+            local fill_ram_group = function ( node, conf )
+                local options = {
+                    name = node,
+                    store_group = ram_type,
+                    db_mode = db_mode,
+                    prject_name = config.project_name,
+                    locker_name = config.store.locker_name,
+                    conf = conf
+                }
+                
+                -- buffer kafka cluster | cache nginx sys_locker | cache redis default | ...
+                ctx_store[store_group][ram_type][node] = ram_store_lib(options)
+            end
+
+            -- 缓存配置解析填充器
+            local switch_fill_func = {
+                ['nginx'] = function()    -- for case nginx
+                    u_each.array_action(ram_type_config, function ( _, item )
+                            fill_ram_group(item, { name = item })
+                        end)
+                end,
+                ['redis'] = function()    -- for case redis
+                    u_each.json_action(ram_type_config, function ( node, conf )
+                            fill_ram_group(node, conf)
+                        end)
+                end,
+                ['kafka'] = function()    -- for case kafka
+                    u_each.json_action(ram_type_config, function ( node, conf )
+                            fill_ram_group(node, conf)
+                        end)
+                end
+            }
+            
+            switch_fill_func[ram_type]()
+        end
+
+        -- 存储对象遍历，绑定配置文件节点，存储配置信息
+        u_each.json_action(config.store, function ( k, v )
+            -- 加载所有已声明的缓存信息，例如：ram_nginx
+            if u_string.starts_with(k, "ram_") then
+                local ram_type = s_gsub(k, "ram_", "")
+                local ram_type_config = v -- config.store[k]
+
+                fill_ram_lib_dict("cache", ram_type, ram_type_config)
+                fill_ram_lib_dict("buffer", ram_type, ram_type_config)
+            end
+        end)
+
+        -- 绑定默认使用对象
+        local bind_store_using = function (store_group)
+            local using_config = config.store[store_group]
+            local tmp_array = u_string.split_gsub(using_config, ".")
+            local ram_type = tmp_array[1]
+            local ram_mode = tmp_array[2] or "default"
+
+            ctx_store[store_group].using = ctx_store[store_group][ram_type][ram_mode]
+        end
+
+        bind_store_using("cache")
+        bind_store_using("buffer")
+        
+        loaded_plugins = load_plugins_handler(config, ctx_store)
         ngx.update_time()
         config.app_start_at = ngx.now()
     end)
@@ -147,11 +199,11 @@ function _M.init(options)
     end
 
     _M.data = {
-        store = store,
+        store = ctx_store,
         config = config
     }
 
-    return config, store
+    return config, ctx_store
 end
 
 function _M.init_worker()
@@ -214,7 +266,7 @@ function _M.header_filter()
         ngx.header[HEADERS.APP_LATENCY] = ngx.ctx.APP_WAITING_TIME
     end
 
-    ngx.header[HEADERS.X_Powered_By] = (_M.data.config.company or "INewMax") .. " App-Framework"
+    ngx.header[HEADERS.X_Powered_By] = (_M.data.config.company or "Meyer") .. " OShit Team"
 end
 
 function _M.body_filter()
@@ -222,8 +274,9 @@ function _M.body_filter()
         plugin.handler:body_filter()
     end
 
+    local now = now()
     if ngx.ctx.ACCESSED then
-        ngx.ctx.APP_RECEIVE_TIME = now() - ngx.ctx.APP_HEADER_FILTER_STARTED_AT
+        ngx.ctx.APP_RECEIVE_TIME = now - (ngx.ctx.APP_HEADER_FILTER_STARTED_AT or now)
     end
 end
 

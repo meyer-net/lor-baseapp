@@ -2,7 +2,7 @@ local object = require "app.lib.classic"
 local _M = object:extend()
 
 function _M:new(name)
-    self._name = name
+    self._name = ( name or "anonymity") .. " store"
 end
 
 function _M:set(k, v)
