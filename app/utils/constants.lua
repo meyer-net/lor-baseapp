@@ -12,5 +12,4 @@ _M.operator = {
     ["not_match"] = "not_match",
 }
 
-
 return _M

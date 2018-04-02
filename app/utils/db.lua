@@ -9,7 +9,9 @@ local u_string = require("app.utils.string")
 local _M = { _VERSION = '0.01' }
 
 ---> 数据库 操作区域 --------------------------------------------------------------------------------------------
+--[[
 ---> 转义SQL语句
+--]]
 function _M.parse_sql(sql, params)
     if not params or not u_table.is_array(params) or #params == 0 then
         return sql
@@ -29,6 +31,25 @@ function _M.parse_sql(sql, params)
 
     return sql
 end 
+
+--[[
+---> 过滤结果集
+--]]
+function _M.filter_records(opts, records)
+    -- 判断是否有结果，执行逻辑动作
+    local value
+    local records_len = #(records)
+    local is_records_nil = records_len == 0
+    if is_records_nil and opts.records_nil then
+        value = opts.records_nil(records)
+    elseif not is_records_nil and opts.records_filter then
+        value = opts.records_filter(records)
+    else
+        value = records
+    end
+    
+    return value
+end
 
 --[[
 ---> 

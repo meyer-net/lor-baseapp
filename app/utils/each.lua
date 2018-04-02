@@ -12,9 +12,15 @@ local _M = { _VERSION = '0.01' }
 ---> 用于类型纯JSON无数组 {"test":"123","demo":"xxx"}
 --]]
 function _M.json_action(json, pair_func)
+    if not u_object.check(json) then
+        return false
+    end
 --- 因使用了pairs，会被解释执行，无法编译成机器码，古此处存在性能缺陷
     for k in pairs(json) do  -- 里层 Keys
-        pair_func(k,json[k])
+        local result = pair_func(k,json[k])
+        if result ~= nil and result == false then
+            break
+        end
     end
 end
 
@@ -25,7 +31,7 @@ function _M.json_array_action(json_array, pair_func)
     for index in ipairs(json_array) do  -- 外层数组
         local pair = json_array[index]  -- 中层元素
 
-    --- 因使用了pairs，会被解释执行，无法编译成机器码，古此处存在性能缺陷
+        -- 因使用了pairs，会被解释执行，无法编译成机器码，古此处存在性能缺陷
         for k,v in pairs(pair) do  -- 里层 Keys
             pair_func(k,v)
         end
@@ -35,10 +41,22 @@ end
 --[[
 ---> 用于普通类型，类似集合、数组遍历
 --]]
-function _M.array_action(array, action)
-    for i, v in ipairs(array) do
-        action(i,v)
+function _M.array_action(array, action, bk_index)
+    if not u_object.check(array) then
+        return false
     end
+
+    local result = true
+    for i, v in ipairs(array) do
+        local res = action(i,v)
+
+        if res == false or (bk_index and i >= bk_index) then
+            result = false
+            break
+        end
+    end
+
+    return result
 end
 
 --[[

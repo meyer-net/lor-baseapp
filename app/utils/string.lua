@@ -1,6 +1,12 @@
+local tostring = tostring
+local type = type
+
 local s_gsub = string.gsub
 local s_find = string.find
+local s_sub = string.sub
 local s_reverse = string.reverse
+local s_rep = string.rep
+local m_floor = math.floor
 local t_insert = table.insert
 
 local date = require("app.lib.date")
@@ -32,7 +38,12 @@ function _M.secure(str)
     return ngx_quote_sql_str(str)
 end
 
----> 字符串分割
+--[[
+---> 功能：分割字符串
+---> URL：http://www.cnblogs.com/xdao/p/lua_string_function.html
+---> 参数：带分割字符串，分隔符
+---> 返回：字符串表
+--]]
 function _M.split(source, delimiter)
     if not source or source == "" then return {} end
     if not delimiter or delimiter == "" then return { source } end
@@ -44,7 +55,9 @@ function _M.split(source, delimiter)
     return array
 end
 
+--[[
 ---> 字符串分割，第二种方式
+--]]
 function _M.split_gsub(source, delimiter)
     if not source or source == "" then return {} end
     if not delimiter or delimiter == "" then return { source } end
@@ -55,6 +68,136 @@ function _M.split_gsub(source, delimiter)
     end)
 
     return array
+end
+
+--[[
+---> 功能：统计字符串中字符的个数
+---> 返回：总字符个数、英文字符数、中文字符数
+--]]
+function _M.count(source)
+  local tmpStr=source
+  local _,sum=s_gsub(source,"[^\128-\193]","")
+  local _,countEn=s_gsub(tmpStr,"[%z\1-\127]","")
+
+  return sum,countEn,sum-countEn
+end
+
+--[[
+---> 功能：计算字符串的宽度，这里一个中文等于两个英文
+--]]
+function _M.width(source)
+  local _,en,cn=_M.count(source)
+  return cn*2+en
+end
+
+--[[
+---> 功能: 把字符串扩展为长度为len,居中对齐, 其他地方以filled_chr补齐
+---> 参数: source 需要被扩展的字符、数字、字符串表，len 被扩展成的长度，
+--->       filled_chr填充字符，可以为空
+--]]
+function _M.tocenter(source, len, filled_chr)
+  local function tocenter(source,len,filled_chr)
+      source = tostring(source);
+      filled_chr = filled_chr or " ";
+      local nRestLen = len - _M.width(source); -- 剩余长度
+      local nNeedCharNum = m_floor(nRestLen / _M.width(filled_chr)); -- 需要的填充字符的数量
+      local nLeftCharNum = m_floor(nNeedCharNum / 2); -- 左边需要的填充字符的数量
+      local nRightCharNum = nNeedCharNum - nLeftCharNum; -- 右边需要的填充字符的数量
+       
+      source = s_rep(filled_chr, nLeftCharNum)..source..s_rep(filled_chr, nRightCharNum); -- 补齐
+      return source
+  end
+
+  if type(source)=="number" or type(source)=="string" then
+      if not s_find(tostring(source),"\n") then
+        return tocenter(source,len,filled_chr)
+      else
+        source=string.split(source,"\n")
+      end
+  end
+
+  if type(source)=="table" then
+    local tmpStr=tocenter(source[1],len,filled_chr)
+    for i=2,#source do
+      tmpStr=tmpStr.."\n"..tocenter(source[i],len,filled_chr)
+    end
+    return tmpStr
+  end
+
+end
+
+--[[
+---> 功能: 把字符串扩展为长度为len,左对齐, 其他地方用filled_chr补齐
+--]]
+function _M.pad_right(source, len, filled_chr)
+  local function toleft(source, len, filled_chr)
+    source = tostring(source);
+    filled_chr = filled_chr or " ";
+    local nRestLen = len - _M.width(source);        -- 剩余长度
+    local nNeedCharNum = m_floor(nRestLen / _M.width(filled_chr)); -- 需要的填充字符的数量
+     
+    source = source..s_rep(filled_chr, nNeedCharNum);     -- 补齐
+    return source;
+  end
+
+  if type(source)=="number" or type(source)=="string" then
+    if not s_find(tostring(source),"\n") then
+      return toleft(source,len,filled_chr)
+    else
+      source=string.split(source,"\n")
+    end
+  end
+
+  if type(source)=="table" then
+    local tmpStr=toleft(source[1],len,filled_chr)
+    for i=2,#source do
+      tmpStr=tmpStr.."\n"..toleft(source[i],len,filled_chr)
+    end
+    return tmpStr
+  end
+end
+
+--[[
+---> 功能: 把字符串扩展为长度为len,右对齐, 其他地方用filled_chr补齐
+--]]
+function _M.pad_left(source, len, filled_chr)
+  local function toright(source, len, filled_chr)
+    source = tostring(source);
+    filled_chr = filled_chr or " ";
+    local nRestLen = len - _M.width(source);        -- 剩余长度
+    local nNeedCharNum = m_floor(nRestLen / _M.width(filled_chr)); -- 需要的填充字符的数量
+     
+    source = s_rep(filled_chr, nNeedCharNum).. source;     -- 补齐
+    return source;
+  end
+  if type(source)=="number" or type(source)=="string" then
+      if not s_find(tostring(source),"\n") then
+        return toright(source,len,filled_chr)
+      else
+        source=string.split(source,"\n")
+      end
+  end
+  if type(source)=="table" then
+    local tmpStr=toright(source[1],len,filled_chr)
+    for i=2,#source do
+      tmpStr=tmpStr.."\n"..toright(source[i],len,filled_chr)
+    end
+    return tmpStr
+  end
+end
+
+--[[
+---> 
+--]]
+function _M.ltrim(source)
+    return s_gsub(source, "^[ \t\n\r]+", "")
+end
+
+--[[
+---> 
+--]]
+function _M.rtrim(source)
+    return s_gsub(source, "[ \t\n\r]+$", "")
 end
 
 --[[
@@ -171,6 +314,41 @@ end
 --]]
 function _M.gen_new_id()
     return uuid()
+end
+
+--[[
+---> 
+--]]
+function _M.to_date(date_string)
+    local Y = s_sub(date_string, 1, 4)  
+    local M = s_sub(date_string, 6, 7)  
+    local D = s_sub(date_string, 9, 10)  
+
+    return os.date({ 
+        year=Y, 
+        month=M, 
+        day=D}) 
+end
+
+--[[
+---> 
+--]]
+function _M.to_time(time_string)
+    local Y = s_sub(time_string, 1, 4)  
+    local M = s_sub(time_string, 6, 7)  
+    local D = s_sub(time_string, 9, 10)  
+
+    local HH = s_sub(time_string, 12, 13) or 0
+    local MM = s_sub(time_string, 15, 16) or 0
+    local SS = s_sub(time_string, 18, 19) or 0
+
+    return os.time({ 
+        year=Y, 
+        month=M, 
+        day=D, 
+        hour=HH,
+        min=MM,
+        sec=SS}) 
 end
 
 --[[
