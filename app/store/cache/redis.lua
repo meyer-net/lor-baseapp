@@ -21,7 +21,7 @@ function _obj:new(conf)
     self._VERSION = '0.02'
     self._name = "cache-redis-store"
     self.config = conf
-    _obj.super.new(self, conf)
+    _obj.super.new(self, conf, self._name)
 end
 
 -----------------------------------------------------------------------------------------------------------------
@@ -160,7 +160,7 @@ function _obj:delete(key)
 	-- 获取缓存连接器
 	local redis = self:_get_connect()
 
-    redis:del(key)
+    return redis:del(key)
 end
 
 function _obj:delete_all()

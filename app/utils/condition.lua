@@ -155,7 +155,7 @@ function _M.judge(condition)
         end
     }
 
-    local action = switch[operator]
+    local action = switch[condition_type]
     if action then 
         action()
     end

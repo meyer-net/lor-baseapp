@@ -27,6 +27,16 @@ function _M.clone (t)
     return _copy(t)
 end
 
+---> 复制并合并表
+function _M.clone_merge (t, m)
+    local new = _M.clone(t)
+    for k, v in pairs(m) do
+        new[k] = v
+    end
+
+    return new
+end
+
 ---> 是否包含
 function _M.contains(t, element)
     for _, value in pairs(t) do
@@ -146,32 +156,24 @@ end
 --[[ 存在部分问题，先废弃
 -- 将 来源表格 中所有键及值复制到 目标表格 对象中，如果存在同名键，则覆盖其值
 -- example
-    local t_src = { c = 3, d = 4 }
-    local t_con = { a = 1, b = 2 }
-    u_table.merge(t_src, t_con)
-    -- t_con = { a = 1, b = 2, c = 3, d = 4 }
+    local source = { c = 3, d = 4 }
+    local dest = { a = 1, b = 2 }
+    u_table.merge(source, dest)
+    -- dest = { a = 1, b = 2, c = 3, d = 4 }
     
--- @param t_con 目标表格(t表示是table)
--- @param t_src 来源表格(t表示是table)
+-- @param dest 目标表格(t表示是table)
+-- @param source 来源表格(t表示是table)
 --]]
--- function _M.merge( t_src, t_con )
---     local r_table, t_table
+function _M.merge( source, dest )
+    source = source or {}
+    local merge = _M.clone(dest) or {}
+    
+    for k, v in pairs(source) do
+        merge[k] = v
+    end
 
---     -- 检测空TABLE，避免两次循环
---     if t_src then
---         r_table = t_src or {}
---         t_table = t_con or {}
---     else
---         r_table = t_con or {}
---         t_table = t_src or {}
---     end
-
---     for k, v in pairs(t_table) do
---         r_table[k] = v
---     end
-
---     return r_table
--- end
+    return merge
+end
 
 --[[
 ---> 

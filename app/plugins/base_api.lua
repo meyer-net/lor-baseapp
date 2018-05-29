@@ -1,3 +1,19 @@
+
+-- 
+--[[
+---> 插件API对外基础类
+--------------------------------------------------------------------------
+---> 参考文献如下
+-----> /
+--------------------------------------------------------------------------
+---> Examples：
+--]]
+--
+-----------------------------------------------------------------------------------------------------------------
+--[[
+---> 统一函数指针
+--]]
+local require = require
 local tonumber = tonumber
 local type = type
 local pairs = pairs
@@ -6,10 +22,40 @@ local setmetatable = setmetatable
 local n_log = ngx.log
 local n_err = ngx.ERR
 local n_info = ngx.INFO
+local n_debug = ngx.DEBUG
 
 local s_upper = string.upper
 local s_lower = string.lower
 local s_format = string.format
+
+--------------------------------------------------------------------------
+
+--[[
+---> 统一引用导入APP-LIBS
+--]]
+--------------------------------------------------------------------------
+-----> 基础库引用
+local l_object = require("app.lib.classic")
+
+-----------------------------------------------------------------------------------------------------------------
+
+--[[
+---> 当前对象
+--]]
+local api = l_object:extend()
+
+--[[
+---> 实例构造器
+------> 子类构造器中，必须实现 api.super.new(self, self._name)
+--]]
+function api:new(name)
+    self._name = s_format("[%s]-api", name)
+    self._apis = {}
+	self._plugin = name
+    self:build_method()
+end
+
+-----------------------------------------------------------------------------------------------------------------
 
 local _METHODS = {
     GET = true,
@@ -19,66 +65,56 @@ local _METHODS = {
     PATCH = true
 }
 
-local BaseAPI = {}
-
-function BaseAPI:new(name)
-    local instance = {}
-    instance._name = name
-    instance._apis = {}
-
-    setmetatable(instance, { __index = self })
-    instance:build_method()
-    return instance
-end
-
-function BaseAPI:get_name()
+function api:get_name()
     return self._name
 end
 
-function BaseAPI:get_apis()
+function api:get_apis()
     return self._apis
 end
 
-function BaseAPI:set_api(path, method, func)
-    if not path or not method or not func then
+function api:set_api(uri, method, func)
+    if not uri or not method or not func then
         return n_log(n_err, "params should not be nil.")
     end
 
-    if type(path) ~= "string" or type(method) ~= "string" or type(func) ~= "function" then
+    if type(uri) ~= "string" or type(method) ~= "string" or type(func) ~= "function" then
         return n_log(n_err, "params type error")
     end 
 
     method = s_upper(method)
     if not _METHODS[method] then 
-        return n_log(n_err, s_format("[%s] method is not supported yet.", method))
+        return n_log(n_err, s_format("[%s] method is not supported yet", method))
     end
     
-    self._apis[path] = self._apis[path] or {}
-    self._apis[path][method] = func
+    self._apis[uri] = self._apis[uri] or {}
+    self._apis[uri][method] = func
 end
 
-function BaseAPI:build_method()
-    for m, _ in pairs(_METHODS) do
-        m = s_lower(m)
-        n_log(n_info, "attach method " .. m .. " to BaseAPI")
-        BaseAPI[m] = function(myself, path, func)
-            BaseAPI.set_api(myself, path, m, func)
+function api:build_method()
+    for method, _ in pairs(_METHODS) do
+        method = s_lower(method)
+        n_log(n_debug, "attach method " .. method .. " to api")
+        api[method] = function(self, uri, func)
+            api.set_api(self, uri, method, func)
         end
     end
 end
 
-function BaseAPI:merge_apis(apis)
+function api:merge_apis(apis)
     if apis and type(apis) == "table" then
-        for path, methods in pairs(apis) do
+        for uri, methods in pairs(apis) do
             if methods and type(methods) == "table" then
-                for m, func in pairs(methods) do
-                    m = s_lower(m)
-                    n_log(n_info, "merge method, path: ", path, " method:", m)
-                    self:set_api(path, m, func)
+                for method, func in pairs(methods) do
+                    method = s_lower(method)
+                    n_log(n_debug, "merge method, uri: ", uri, " method:", method)
+                    self:set_api(uri, method, func)
                 end
             end
         end
     end
 end
 
-return BaseAPI
+-----------------------------------------------------------------------------------------------------------------
+
+return api

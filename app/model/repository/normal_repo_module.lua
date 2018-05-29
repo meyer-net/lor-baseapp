@@ -55,11 +55,11 @@ function model:new(config, store, name)
     self._name = (name or "anonymity") .. "-repository-model"
     
     -- 用于操作缓存与DB的对象
-    self.store = store
+    self._store = store
 
     -- 用于连接数据的节点
-    self.adapter = {
-      current_db = store.db["config_db_node_name"]
+    self._adapter = {
+      current_db = self._store.db["default"] or self._store.db[""]
     }
 end
 
@@ -72,7 +72,7 @@ end
 -- 	local command_text = "INSERT INTO `model_module` (`gid`, `create_date`) VALUES (?, ?)"
 -- 	local command_params = {  }
 
--- 	return self.adapter.current_db.insert({
+-- 	return self._adapter.current_db.insert({
 --                 sql = command_text,
 --                 params = command_params
 --             })
@@ -84,7 +84,7 @@ end
 -- 	local command_text = "UPDATE `model_module` SET A=? WHERE id=?"
 -- 	local command_params = { params.id }
 
--- 	return self.adapter.current_db.update({
+-- 	return self._adapter.current_db.update({
 --                 sql = command_text,
 --                 params = command_params
 --             })
@@ -97,7 +97,7 @@ end
 -- 	local query_text = "SELECT * FROM `model_module`"
 -- 	local query_params = { }
 
--- 	return self.adapter.current_db.query({
+-- 	return self._adapter.current_db.query({
 --                 sql = query_text,
 --                 params = query_params,
 --  			  	records_filter = function (records)
@@ -113,7 +113,7 @@ end
 --     local query_text = "SELECT * FROM `model_module`"
 --     local query_params = { }
 --     
---     return self.adapter.current_db.query({
+--     return self._adapter.current_db.query({
 --                 sql = query_text,
 --                 params = query_params,
 --                 records_filter = function (records)

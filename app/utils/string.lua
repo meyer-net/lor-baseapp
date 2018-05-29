@@ -10,7 +10,7 @@ local m_floor = math.floor
 local t_insert = table.insert
 
 local date = require("app.lib.date")
-local uuid = require("app.lib.uuid")
+local l_uuid = require("app.lib.uuid")
 local r_sha256 = require("resty.sha256")
 local r_string = require("resty.string")
 local ngx_quote_sql_str = ngx.quote_sql_str
@@ -196,8 +196,9 @@ end
 --[[
 ---> 
 --]]
-function _M.rtrim(source)
-    return s_gsub(source, "[ \t\n\r]+$", "")
+function _M.rtrim(source, ends)
+    ends = ends or "\t\n\r"
+    return s_gsub(source, "[ "..ends.."]+$", "")
 end
 
 --[[
@@ -205,6 +206,19 @@ end
 --]]
 function _M.trim(source)  
     return s_gsub(source, "^%s*(.-)%s*$", "%1")
+end
+
+--[[
+---> 
+--]]
+function _M.trim_uri_args( uri )
+    local from, to, err = ngx.re.find(uri, "\\?", 'isjo')
+
+    if from and to and from == to and not err then
+        return s_sub(uri, 0, to - 1)
+    end
+
+    return uri
 end
 
 --[[
@@ -306,14 +320,14 @@ end
 ---> 
 --]]
 function _M.gen_random_string()
-    return uuid():gsub("-", "")
+    return l_uuid():gsub("-", "")
 end
 
 --[[
 ---> 
 --]]
 function _M.gen_new_id()
-    return uuid()
+    return l_uuid()
 end
 
 --[[

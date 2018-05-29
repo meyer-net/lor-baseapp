@@ -161,6 +161,7 @@ function _adapter:open()
     end
 
     return {
+        name          = self._name;
         exec          =  exec;
         find_all      =  find_all;
         find_page     =  find_page;

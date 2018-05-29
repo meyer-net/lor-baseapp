@@ -18,9 +18,9 @@ local _M = l_object:extend()
 --[[
 ---> RDS 选区
 --]]
-function _M:new(conf)
+function _M:new(conf, name)
     self._VERSION = '0.02'
-    self._name = "cache-base-store"
+    self._name = name or "cache-base-store"
 
     self.config = conf
 end

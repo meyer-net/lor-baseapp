@@ -112,6 +112,15 @@ _T.from = function(self, tname, alias)
     return self
 end
 
+_T.db = function(self, db)
+    assert(self._from, "please exec 'from()' function to sure table name first.")
+    if db then
+        self._from = db.."."..self._from
+    end
+
+    return self
+end
+
 _T.build_where = function(self, cond, params)
     return '(' .. build_cond(self._db, cond, params) .. ')'
 end

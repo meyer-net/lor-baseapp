@@ -55,19 +55,20 @@ local model = l_object:extend()
 
 --[[
 ---> 实例构造器
-------> 子类构造器中，必须实现 model.super.new(self, self._name, store, adapter)
+------> 子类构造器中，必须实现 model.super.new(self, self._name, orm_driver)
 --]]
-function model:new(source, store_node)
+function model:new(source, orm_driver)
 	-- 指定名称
 	self._source = source or "[anymouse]"
     self._name = s_format("%s-repo-model", self._source)
     
-    -- 用于操作落地的DB节点对象
-    self._store_node = store_node
-
+	-- 用于操作落地的DB节点对象
+	assert(orm_driver, s_format("Can't not find the node which repo of '%s' used it", source))
+	self._orm_driver = orm_driver
+	
     -- 用于连接数据的节点
-    self.adapter = {
-    	current_model = (store_node).define_model(self._source)
+    self._adapter = {
+    	current_model = (orm_driver).define_model(self._source)
     }
 end
 
@@ -197,7 +198,7 @@ end
 ---> 保存一条记录，并返回ok, id，auto_model 为是否启用含主键自动变为更新机制
 --]]
 function model:save(mdl, auto_model)
-	return self.adapter.current_model.new(mdl):save(auto_model)
+	return self._adapter.current_model.new(mdl):save(auto_model)
 end
 
 --[[
@@ -205,7 +206,7 @@ end
 --]]
 function model:delete(attr)
 	local cond, params = self:resolve_attr(attr)
-	return self.adapter.current_model.delete_where(cond, t_unpack(params))
+	return self._adapter.current_model.delete_where(cond, t_unpack(params))
 end
 
 --[[
@@ -213,7 +214,7 @@ end
 --]]
 function model:update(mdl, attr)
 	local cond, params = self:resolve_attr(attr)
-	return self.adapter.current_model.update_where(mdl, cond, t_unpack(params))
+	return self._adapter.current_model.update_where(mdl, cond, t_unpack(params))
 end
 
 --[[
@@ -221,7 +222,7 @@ end
 --]]
 function model:find_one(attr)
 	local cond, params = self:resolve_attr(attr)
-	return self.adapter.current_model.find_one(cond, t_unpack(params))
+	return self._adapter.current_model.find_one(cond, t_unpack(params))
 end
 
 --[[
@@ -229,7 +230,7 @@ end
 --]]
 function model:find_all(attr, slt)
 	local cond, params = self:resolve_attr(attr, slt)
-	return self.adapter.current_model.find_all(cond, t_unpack(params))
+	return self._adapter.current_model.find_all(cond, t_unpack(params))
 end
 
 --[[
@@ -237,7 +238,7 @@ end
 --]]
 function model:find_hash_all(key, attr)
 	local cond, params = self:resolve_attr(attr)
-    local ok, records  = self.adapter.current_model.find_all(cond, params)
+    local ok, records  = self._adapter.current_model.find_all(cond, params)
 
     return ok, u_db.filter_records({
     		records_filter = function (records)

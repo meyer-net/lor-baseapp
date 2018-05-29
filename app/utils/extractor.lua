@@ -192,7 +192,7 @@ function _M.extract_variables(extractor)
     if extractions then
         variables = _M.extract(extractor_type, extractions)
     end
-
+    
     return variables
 end
 

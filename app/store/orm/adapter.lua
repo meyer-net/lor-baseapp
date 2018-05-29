@@ -159,7 +159,7 @@ function _adapter:open()
 
     local driver_path = "app.store.drivers."..driver
     local ok, db = pcall(require, driver_path)
-    assert(ok, s_format("[%s.open]No driver for %s", namespace, driver_path))
+    assert(ok, s_format("[%s.open]No driver for %s, %s", namespace, driver_path, db or " there's none internal error"))
 
     local conn = db(conf)
 
@@ -168,7 +168,7 @@ function _adapter:open()
     end
 
     local define_model = function(table_name) 
-        return o_model(conn, create_query, table_name) 
+        return o_model(conn, create_query, table_name, conf.database) 
     end
 
     local transaction = function(fn)
@@ -197,6 +197,7 @@ function _adapter:open()
     end
 
     return {
+        name         = self._name;
         db           = conn;
         transaction  = transaction;
         create_query = create_query;

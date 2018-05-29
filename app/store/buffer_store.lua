@@ -37,8 +37,6 @@ function _obj:new(options)
     self.store_group = options.store_group
     self.store_config = options.conf
     self.buffer = s_adapter:new(self.store_config)[self.store_group]()
-    
-    self._db_mode = options.db_mode
 
     _obj.super.new(self, self._name)
 end

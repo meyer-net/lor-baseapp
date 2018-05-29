@@ -31,13 +31,13 @@ _obj.support_types = { "nginx", "redis" }
 --]]
 function _obj:new(options)
     self._VERSION = '0.02'
-    self._name = ( options and options.name or "anonymity") .. " cache store"
+    self._name = s_format("%s-%s-cache", options.store_group, (options and options.name or "anonymity"))
     self._locker_name = ( options and options.locker_name ) or "sys_locker"
 
-    self.store_group = options.store_group
-    self.store_config = options.conf
-    self.cache = s_adapter:new(self.store_config)[self.store_group]()
-    self._db_mode = options.db_mode
+    self._store_group = options.store_group
+    self._store_config = options.conf
+    self._cache = s_adapter:new(self._store_config)[self._store_group]()
+    self._cache_name = self._cache._name
 
     _obj.super.new(self, self._name)
 end
@@ -59,7 +59,7 @@ function _obj:parse_callback( ... )
 
     -- 常规模式 records, err 为正常搭配，而orm则为 ok, records（该模式当ok为非true时，会变成描述详细错误）
     local ok, records, err, timeout
-    if not self._db_mode or self._db_mode == "normal" then
+    if type(args[1]) ~= 'boolean' and type(args[1] ~= 'string') then
         records = args[1]
         err = args[2]
     else
@@ -206,7 +206,7 @@ function _obj:load_and_set(key, callback, timeout)
 end
 
 function _obj:get(key)
-    return self.cache:get(key)
+    return self._cache:get(key)
 end
 
 function _obj:get_json(key)
@@ -218,48 +218,40 @@ function _obj:get_json(key)
 end
 
 function _obj:set(key, value, timeout)
-    return self.cache:set(key, value, timeout)
+    return self._cache:set(key, value, timeout)
 end
 
 function _obj:set_json(key, value, timeout)
     if value then
         value = c_json.encode(value)
     end
-    return _obj:set(key, value, timeout)
+    return self:set(key, value, timeout)
 end
 
 function _obj:incr(key, value, timeout)
-    return self.cache:incr(key, value, timeout)
-end
-
-function _obj:delete(key)
-    self.cache:delete(key)
-end
-
-function _obj:delete_all()
-    self.cache:delete_all()
+    return self._cache:incr(key, value, timeout)
 end
 
 -----------------------------------------------------------------------------------------------------------------
 
 function _obj:lpush(key, value)
-    return self.cache:lpush(key, value)
+    return self._cache:lpush(key, value)
 end
 
 function _obj:llen(key)
-    return self.cache:llen(key)
+    return self._cache:llen(key)
 end
 
 function _obj:rpush(key, value)
-    return self.cache:rpush(key, value)
+    return self._cache:rpush(key, value)
 end
 
 function _obj:lpop(key, value)
-    return self.cache:lpop(key, value)
+    return self._cache:lpop(key, value)
 end
 
 function _obj:rpop(key, value)
-    return self.cache:rpop(key, value)
+    return self._cache:rpop(key, value)
 end
 
 -- 并行提交
@@ -270,29 +262,37 @@ end
 --     n_log(n_err, s_format("METHOD:[service.%s.push.pipeline] QUEUE:[%s] failure! error: %s", self._name, queue_name, err))
 -- end
 function _obj:pipeline_command(action)
-    return self.cache:pipeline_command(action)
+    return self._cache:pipeline_command(action)
 end
 
 -----------------------------------------------------------------------------------------------------------------
 
 function _obj:hmset(key, value, timeout)
-    return self.cache:hmset(key, value, timeout)
+    return self._cache:hmset(key, value, timeout)
 end
 
 function _obj:keys(pattern)
-    return self.cache:keys(pattern)
+    return self._cache:keys(pattern)
 end
 
 -----------------------------------------------------------------------------------------------------------------
 
 function _obj:append(key, item, limit)
-    return self.cache:append(key, item, limit)
+    return self._cache:append(key, item, limit)
 end
 
 -----------------------------------------------------------------------------------------------------------------
 
+function _obj:del(key)
+    return self._cache:delete(key)
+end
+
 function _obj:delete(key)
-    return self.cache:delete(key)
+    return self._cache:delete(key)
+end
+
+function _obj:delete_all()
+    return self._cache:delete_all()
 end
 
 -----------------------------------------------------------------------------------------------------------------

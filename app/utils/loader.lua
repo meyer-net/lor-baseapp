@@ -5,10 +5,10 @@ local pcall = pcall
 local error = error
 
 local s_find = string.find
+local s_format = string.format
 
-local log = ngx.log
-local log_debug = ngx.DEBUG
-local log_err = ngx.ERR
+local n_log = ngx.log
+local n_err = ngx.ERR
 
 -- 统一引用导入LIBS
 local c_json = require("cjson.safe")
@@ -23,12 +23,11 @@ function _M.load_config(config_path)
     config_path = config_path or "./conf/vhosts/sys.conf"
     local config_contents = u_io.read_file(config_path)
 
-    if not config_contents then
-        log(log_err, "No configuration file at: ", config_path)
-        os.exit(1)
-    end
-
+    assert(config_contents, s_format("No configuration file at: '%s'", config_path))
+    
     local config = c_json.decode(config_contents)
+    assert(config, s_format("Can't decode configuration from: '%s'", config_path))
+
     return config, config_path
 end
 

@@ -11,10 +11,10 @@ local t_concat = table.concat
 
 local namespace = "app.store.orm.model"
 
-local function define_model(DB, Query, table_name)
-    local _M = {  }
+local function define_model(DB, Query, table_name, db_name)
+    local _M = { db_name = db_name }
     local _relations = {  }
-
+    
     assert(type(table_name) == 'string', s_format("[%s.define_model]Table name required", namespace))
 
     _M.table_name = function() 
@@ -82,7 +82,7 @@ local function define_model(DB, Query, table_name)
         end
 
         local function query()
-            return Query():from(table_name)
+            return Query():from(table_name):db(db_name)
         end
 
         Model.query = query

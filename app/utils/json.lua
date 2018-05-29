@@ -1,5 +1,8 @@
 local t_insert = table.insert
 local t_concat = table.concat
+local s_format = string.format
+
+local c_json = require("cjson.safe")
 
 local u_object = require("app.utils.object")
 local u_each = require("app.utils.each")
@@ -109,6 +112,55 @@ function _M.json_field_value_combine_to_string(json, spliter)
     local array = _M.json_field_value_combine(json)
 
     return t_concat(array, spliter)
+end
+
+--[[
+---> 
+--]]
+function _M.encode(data, empty_table_as_object)
+    if not data then return nil end
+
+    if c_json.encode_empty_table_as_object then
+        -- empty table default is arrya
+        c_json.encode_empty_table_as_object(empty_table_as_object or false)
+    end
+
+    if require("ffi").os ~= "Windows" then
+        c_json.encode_sparse_array(true)
+    end
+
+    return c_json.encode(data)
+end
+
+--[[
+---> 
+--]]
+function _M.decode(data)
+    if not data then return nil end
+
+    return c_json.decode(data)
+end
+
+--[[
+---> 
+--]]
+function _M.to_url_param(json)
+    if not json then return nil end
+
+    local url_param = ""
+    u_each.json_action(json, function ( k, v )
+        local spliter = (#url_param > 0 and "&") or ""
+        local new_v = v
+        if type(v) == "table" then
+            new_v = c_json.encode(v)
+        end
+
+        local kv_value = s_format("%s=%s", k, new_v)
+
+        url_param = s_format("%s%s%s", url_param, spliter, kv_value)
+    end)
+    
+    return url_param
 end
 
 --[[

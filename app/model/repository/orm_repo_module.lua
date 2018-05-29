@@ -54,10 +54,10 @@ local model = o_repo:extend()
 function model:new(config, store)
 	-- 指定名称
 	self._source = "[model_module]"
-	self._store_node = store.db["default"] or store.db[""]
+	self._orm_driver = store.db["default"] or store.db[""]
 
 	-- 传导至父类填充基类操作对象
-    model.super.new(self, self._source, self._store_node)
+    model.super.new(self, self._source, self._orm_driver)
 end
 
 -----------------------------------------------------------------------------------------------------------------
@@ -67,7 +67,7 @@ end
 --]]
 -- function model:find_(attr)
 -- 	local cond, params = self:resolve_attr(attr)
--- 	return self.adapter.current_model.find_all(cond, table.unpack(params))
+-- 	return self._adapter.current_model.find_all(cond, table.unpack(params))
 -- end
 
 -----------------------------------------------------------------------------------------------------------------
