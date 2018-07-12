@@ -39,9 +39,14 @@ local open = function(conf)
         
         return  {
             conn = http;
-            query = function(self, str) 
+            query = function(self, str)
+                local ident_path = "/"
+                if conf.user and conf.password then
+                    ident_path = s_format("%s?user=%s&password=%s", ident_path, conf.user, conf.password)
+                end
+
                 local res, err = http:request({
-                    path = "/",
+                    path = ident_path,
                     method = "POST",
                     headers = headers,
                     body = str
@@ -53,7 +58,8 @@ local open = function(conf)
                 end
                 
                 -- if u_string.starts_with(res.status, "2") or u_string.starts_with(res.status, "3") then
-                if res.has_body then
+                local body_err = get_err()
+                if res.has_body and not body_err then
                     if not u_object.check(body) then
                         body = {
                             insert_id = 0,
@@ -68,10 +74,11 @@ local open = function(conf)
                         end
                     end
                 else
+                    body = nil
                     err = c_json.encode({
                         status = res.status,
                         http_err = err,
-                        body_err = get_err()
+                        body_err = body_err
                     })
                 end
 

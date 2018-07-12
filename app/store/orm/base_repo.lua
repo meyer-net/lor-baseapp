@@ -38,37 +38,39 @@ local t_unpack = table.unpack
 --]]
 --------------------------------------------------------------------------
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local u_base = require("app.utils.base")
 
 -----> 工具引用
-local u_object = require("app.utils.object")
-local u_string = require("app.utils.string")
-local u_each = require("app.utils.each")
--- local u_table = require("app.utils.table")
+--
+
 --------------------------------------------------------------------------
 
 --[[
 ---> 当前对象
 --]]
-local model = l_object:extend()
+local model = u_base:extend()
 -----------------------------------------------------------------------------------------------------------------
 
 --[[
 ---> 实例构造器
 ------> 子类构造器中，必须实现 model.super.new(self, self._name, orm_driver)
 --]]
-function model:new(source, orm_driver)
+function model:new(conf, store, source, conf_db_node)
 	-- 指定名称
+	assert(source, s_format("Can't assign the source '%s' which repo used it", source))
 	self._source = source or "[anymouse]"
-    self._name = s_format("%s-repo-model", self._source)
+	
+	local name = s_format("%s-repo-model", self._source)
+	
+	model.super.new(self, name)
     
 	-- 用于操作落地的DB节点对象
-	assert(orm_driver, s_format("Can't not find the node which repo of '%s' used it", source))
-	self._orm_driver = orm_driver
+	assert(conf_db_node, s_format("Can't assign the db conf node '%s' which repo of '%s' used it", conf_db_node or "unknow", source))
+	self._orm_driver = store.db[conf_db_node] or store.db[""]
 	
     -- 用于连接数据的节点
     self._adapter = {
-    	current_model = (orm_driver).define_model(self._source)
+    	current_model = (self._orm_driver).define_model(self._source)
     }
 end
 
@@ -114,10 +116,10 @@ function model:get_perch(obj)
 	end
 
 	-- 为表达式的情况下
-	if (u_string.starts_with(upper_obj, "MAX%(") or
-	    u_string.starts_with(upper_obj, "MIN%(")) then
+	if (self.utils.string.starts_with(upper_obj, "MAX%(") or
+	    self.utils.string.starts_with(upper_obj, "MIN%(")) then
 	   	local reverse_obj = s_reverse(upper_obj)
-	   	if u_string.starts_with(reverse_obj, "%)") then
+	   	if self.utils.string.starts_with(reverse_obj, "%)") then
 	   		return "?e"
 	   	end
 	end
@@ -133,11 +135,11 @@ function model:get_cond(cond, orders, slt)
 		cond = cond
 	}
 
-	if u_object.check(orders) then
+	if self.utils.object.check(orders) then
 		_cond.orders = orders
 	end
 
-	if u_object.check(slt) then
+	if self.utils.object.check(slt) then
 		_cond.fields = slt.fields
 		_cond.values = slt.values
 	end
@@ -155,7 +157,7 @@ function model:resolve_attr(attrs, slt)
 	local orders = ""
 	local params = {}
 
-	u_each.json_action(attrs, function ( key, value )
+	self.utils.each.json_action(attrs, function ( key, value )
 		local opr = '='
 		local cvrt = true  -- 是否对值进行转换
 		if type(key) == "number" and type(value) == "table" then
@@ -243,7 +245,7 @@ function model:find_hash_all(key, attr)
     return ok, u_db.filter_records({
     		records_filter = function (records)
                     local hash_records = {}
-                    u_each.array_action(records, function (_, item)
+                    self.utils.each.array_action(records, function (_, item)
                         local tmp_key = tostring(item[key])
                         item[key] = nil
                         hash_records[tmp_key] = item

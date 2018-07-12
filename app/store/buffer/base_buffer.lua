@@ -80,7 +80,7 @@ function _M:record_mq_keys(store, source_key, format_key)
 				local mq_current = store:get(current_key)
 				if mq_current ~= format_key then
 					store:set(current_key, format_key)
-					store:lpush(mq_key, format_key)
+					store:lpush(mq_key, mq_current)
 				end
             end)
 		end)
