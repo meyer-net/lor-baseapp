@@ -197,10 +197,7 @@ function _adapter:open()
     end
 
     return {
-<<<<<<< HEAD
         name         = self._name;
-=======
->>>>>>> 77203e6a4e70d5bc9d619b7bf50f8e25884c5b97
         db           = conn;
         transaction  = transaction;
         create_query = create_query;
