@@ -368,6 +368,41 @@ end
 --[[
 ---> 
 --]]
+function _M.to_date(date_string)
+    local Y = s_sub(date_string, 1, 4)  
+    local M = s_sub(date_string, 6, 7)  
+    local D = s_sub(date_string, 9, 10)  
+
+    return os.date({ 
+        year=Y, 
+        month=M, 
+        day=D}) 
+end
+
+--[[
+---> 
+--]]
+function _M.to_time(time_string)
+    local Y = s_sub(time_string, 1, 4)  
+    local M = s_sub(time_string, 6, 7)  
+    local D = s_sub(time_string, 9, 10)  
+
+    local HH = s_sub(time_string, 12, 13) or 0
+    local MM = s_sub(time_string, 15, 16) or 0
+    local SS = s_sub(time_string, 18, 19) or 0
+
+    return os.time({ 
+        year=Y, 
+        month=M, 
+        day=D, 
+        hour=HH,
+        min=MM,
+        sec=SS}) 
+end
+
+--[[
+---> 
+--]]
 --function _M.()
     -- body
 --end

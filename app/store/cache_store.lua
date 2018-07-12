@@ -166,6 +166,8 @@ function _obj:save_and_update(key, value, callback, timeout)
         n_log(n_err, "METHOD:[save_and_update] KEY:["..key.."], callback save error"..err)
         return false
     end
+
+    return true
 end
 
 -- 更新本地缓存并保存到存储系统
@@ -293,6 +295,18 @@ end
 
 function _obj:delete_all()
     return self._cache:delete_all()
+end
+
+-----------------------------------------------------------------------------------------------------------------
+
+function _obj:append(key, item, limit)
+    return self.cache:append(key, item, limit)
+end
+
+-----------------------------------------------------------------------------------------------------------------
+
+function _obj:delete(key)
+    return self.cache:delete(key)
 end
 
 -----------------------------------------------------------------------------------------------------------------
