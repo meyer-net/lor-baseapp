@@ -60,7 +60,7 @@ end
 -----------------------------------------------------------------------------------------------------------------
 
 ---> 加载其他"可用"插件API
-local function load_plugin_api(conf, store, plugin, router)
+local function fill_plugin_api(conf, store, plugin, router)
     local plugin_api_namespace = s_format("app.plugins.%s.api", plugin)
     
     local ok, plugin_api, ex
@@ -96,7 +96,7 @@ function model:load_router(router_func)
     local router = lor:Router()
 
     if router_func and type(router_func) == "function" then
-        router_func(router, self._conf, self._store, self._cache)
+        router_func(router)
     end
 
     local available_plugins = self._conf.plugins
@@ -104,11 +104,57 @@ function model:load_router(router_func)
         n_log(n_err, "no available plugins, maybe you should check `sys.conf`.")
     else
         for _, plugin in ipairs(available_plugins) do
-            load_plugin_api(self._conf, self._store, plugin, router)
+            fill_plugin_api(self._conf, self._store, plugin, router)
         end
     end
 
     return router
+end
+
+function model:load_plugins()
+    local available_plugins = self._conf.plugins
+    local plugins = {}
+    for i, v in ipairs(available_plugins) do
+        local tmp
+        if v ~= "kvstore" then
+            tmp = {
+                enable =  self._cache:get(v .. ".enable"),
+                name = v,
+                active_selector_count = 0,
+                inactive_selector_count = 0,
+                active_rule_count = 0,
+                inactive_rule_count = 0
+            }
+            
+            local plugin_selectors = self._cache:get_json(v .. ".selectors")
+            if plugin_selectors then
+                for sid, s in pairs(plugin_selectors) do
+                    if s.enable == true then
+                        tmp.active_selector_count = tmp.active_selector_count + 1
+                        local selector_rules = self._cache:get_json(v .. ".selector." .. sid .. ".rules")
+                        for _, r in ipairs(selector_rules) do
+                            if r.enable == true then
+                                tmp.active_rule_count = tmp.active_rule_count + 1
+                            else
+                                tmp.inactive_rule_count = tmp.inactive_rule_count + 1
+                            end
+                        end
+                    else
+                        tmp.inactive_selector_count = tmp.inactive_selector_count + 1
+                    end
+                end
+            end
+        else
+            tmp = {
+                enable =  (v=="stat") and true or (self._cache:get(v .. ".enable") or false),
+                name = v
+            }
+        end
+        
+        plugins[v] = tmp
+    end
+
+    return plugins
 end
 
 -----------------------------------------------------------------------------------------------------------------

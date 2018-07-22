@@ -58,30 +58,30 @@ end
 
 function _M.filter_and_conditions(conditions)
     if not conditions then return false end
-
-    local pass = false
+    
+    local pass, match = false
     for i, c in ipairs(conditions) do
-        pass = u_condition.judge(c)
+        pass, match = u_condition.judge(c)
         if not pass then
             return false
         end
     end
 
-    return pass
+    return pass, match
 end
 
 function _M.filter_or_conditions(conditions)
     if not conditions then return false end
 
-    local pass = false
+    local pass, match = false
     for i, c in ipairs(conditions) do
-        pass = u_condition.judge(c)
+        pass, match = u_condition.judge(c)
         if pass then
             return true
         end
     end
 
-    return pass
+    return pass, match
 end
 
 function _M.filter_complicated_conditions(expression, conditions, plugin_name)
@@ -95,19 +95,19 @@ function _M.filter_complicated_conditions(expression, conditions, plugin_name)
     local ok, u_condition = _M.parse_conditions(expression, params)
     if not ok then return false end
 
-    local pass = false
+    local pass, match = false
     local func, err = loadstring("return " .. u_condition)
     if not func or err then
         n_log(n_err, "failed to load script: ", u_condition)
         return false
     end
 
-    pass = func()
+    pass, match = func()
     if pass then
         n_log(n_info, "[", plugin_name or "", "]filter_complicated_conditions: ", expression)
     end
 
-    return pass
+    return pass, match
 end
 
 function _M.judge_selector(selector, plugin_name)
@@ -116,14 +116,14 @@ function _M.judge_selector(selector, plugin_name)
     local selector_judge = selector.judge
     local judge_type = selector_judge.type
     local conditions = selector_judge.conditions
-
+    
     local selector_pass = false
     if judge_type == 0 or judge_type == 1 then
-        selector_pass = _M.filter_and_conditions(conditions)
+        selector_pass, match = _M.filter_and_conditions(conditions)
     elseif judge_type == 2 then
-        selector_pass = _M.filter_or_conditions(conditions)
+        selector_pass, match = _M.filter_or_conditions(conditions)
     elseif judge_type == 3 then
-        selector_pass = _M.filter_complicated_conditions(selector_judge.expression, conditions, plugin_name)
+        selector_pass, match = _M.filter_complicated_conditions(selector_judge.expression, conditions, plugin_name)
     end
 
     return selector_pass
@@ -135,16 +135,16 @@ function _M.judge_rule(rule, plugin_name)
     local judge = rule.judge
     local judge_type = judge.type
     local conditions = judge.conditions
-    local pass = false
+    local pass, match = false
     if judge_type == 0 or judge_type == 1 then
-        pass = _M.filter_and_conditions(conditions)
+        pass, match = _M.filter_and_conditions(conditions)
     elseif judge_type == 2 then
-        pass = _M.filter_or_conditions(conditions)
+        pass, match = _M.filter_or_conditions(conditions)
     elseif judge_type == 3 then
-        pass = _M.filter_complicated_conditions(judge.expression, conditions, plugin_name)
+        pass, match = _M.filter_complicated_conditions(judge.expression, conditions, plugin_name)
     end
 
-    return pass
+    return pass, match
 end
 
 --[[

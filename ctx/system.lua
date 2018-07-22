@@ -19,6 +19,8 @@ local u_each = require("app.utils.each")
 local u_table = require("app.utils.table")
 local u_string = require("app.utils.string")
 
+local r_plugin = require("app.model.repository.plugin_repo")
+
 -------------------------------------------------- Plugins -------------------------------------------------
 
 local HEADERS = {
@@ -224,6 +226,28 @@ function _M.init(options)
 end
 
 function _M.init_worker()
+    -- 仅在 init_worker 阶段调用，初始化随机因子，仅允许调用一次
+    math.randomseed(tostring(ngx.now()*1000):reverse())
+
+    -- 初始化定时器，清理计数器等    
+    local worker_id = ngx.worker.id()
+    if worker_id == 0 then
+        local ok, err = ngx.timer.at(0, function(premature, store, config)
+            local current_repo = r_plugin(_M.data.config, _M.data.store)
+            u_each.array_action(config.plugins, function (_, plugin)
+                local load_success = current_repo:load_data_by_db(plugin)
+                if not load_success then
+                    os.exit(1)
+                end
+            end)
+        end, _M.data.store, _M.data.config)
+
+        if not ok then
+            ngx.log(ngx.ERR, "failed to create the timer: ", err)
+            return os.exit(1)
+        end
+    end
+
     for _, plugin in ipairs(loaded_plugins) do
         plugin.handler:init_worker()
     end

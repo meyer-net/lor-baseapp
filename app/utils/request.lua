@@ -1,3 +1,22 @@
+-- 
+--[[
+---> 对请求体进行一定操作
+--------------------------------------------------------------------------
+---> 参考文献如下
+-----> 
+--------------------------------------------------------------------------
+---> Examples：
+-----> 请求体追加参数：
+local trans_ok, trans_err = self._request:transform_post({
+    payload = ident_payload
+})
+
+if trans_err then
+    case_error_exit(ue_error.get_err(self.utils.ex.error.EVENT_CODE.param_format_err, err))
+end
+--]]
+--
+-----------------------------------------------------------------------------------------------------------------
 --[[
 ---> 统一函数指针
 --]]
@@ -10,6 +29,9 @@ local s_match = string.match
 local s_find = string.find
 local s_len = string.len
 local s_sub = string.sub
+
+local t_concat = table.concat
+local t_insert = table.insert
 
 local n_req = ngx.req
 
@@ -64,6 +86,17 @@ local HTTP_METHOD = {
 
 -----------------------------------------------------------------------------------------------------------------
 
+--升级版(能处理content-type=multipart/form-data的表单)：
+local function explode ( _str,seperator )
+    local pos, arr = 0, {}
+        for st, sp in function() return s_find( _str, seperator, pos, true ) end do
+            t_insert( arr, s_sub( _str, pos, st-1 ) )
+            pos = sp + 1
+        end
+    t_insert( arr, s_sub( _str, pos ) )
+    return arr
+end
+
 --- 匹配并返回指定值
 local function match_return( source, exp, value )
     return s_find(source, exp, nil, true) and value
@@ -81,8 +114,13 @@ end
 
 function obj:transform_headers_to_body (trans_type, new_body, body, content_type_value)
     body = body and body or ""
+    new_body = new_body or {}
     local content_length = s_len(body)
     local is_body_transed = false
+
+    if content_length == 0 then
+        return false, body
+    end
 
     local switch = {
         [APP_JSON] = function ()
@@ -142,7 +180,7 @@ function obj:transform_headers_to_body (trans_type, new_body, body, content_type
     }
 
     local switch_trans_func = switch[trans_type]
-    if not new_body or not switch_trans_func then
+    if not switch_trans_func then
         return false, body
     end
 
@@ -152,9 +190,90 @@ end
 --------------------------------------------------------------------------
 
 --[[
+---> 数据转换为JSON
+in: body -> string
+--]]
+function obj:get_transform_json(body)
+    local args = {}
+    --判断是否是multipart/form-data类型的表单      
+    local content_type_value = n_req.get_headers(0)[CONTENT_TYPE]
+    local trans_type = self:get_trans_type(content_type_value)
+    if trans_type == MULTI_PART then
+        if not body then
+            local datafile = ngx.req.get_body_file()
+            if not datafile then
+                error_code = 1
+                error_msg = "no request body found"
+            else
+                local fh, err = io.open(datafile, "r")
+                if not fh then
+                    error_code = 2
+                    error_msg = "failed to open " .. tostring(datafile) .. "for reading: " .. tostring(err)
+                else
+                    fh:seek("set")
+                    body = fh:read("*a")
+                    fh:close()
+                    if body == "" then
+                        error_code = 3
+                        error_msg = "request body is empty"
+                    end
+                end
+            end
+        end  
+        --确保取到请求体的数据
+        if not error_code then
+            local boundary = "--" .. s_sub(content_type_value, 31)
+            local body_table = explode(body,boundary)
+            local first_string = table.remove(body_table, 1)
+            local last_string = table.remove(body_table)
+            for i,v in ipairs(body_table) do
+                local start_pos,end_pos,capture,capture2 = s_find(v,'Content%-Disposition: form%-data; name="(.+)"; filename="(.*)"')
+                --普通参数
+                if not start_pos then
+                    local t = explode(v,"\r\n\r\n")
+                    local temp_param_name = s_sub(t[1], 41, -2)
+                    local temp_param_value = s_sub(t[2], 1, -3)
+                    args[temp_param_name] = temp_param_value
+                end
+            end
+        end
+    else
+        args = c_json.decode(body)
+    end
+
+    return args
+end
+
+--[[
+---> 获取类型
+--]]
+function obj:get_trans_type(content_type_value)
+    if not content_type_value then
+        content_type_value = DEFAULT_CONTENT_TYPE_VALUE
+        n_req.set_header(CONTENT_TYPE, content_type_value)
+    end
+
+    return match_trans_type(content_type_value)
+end
+
+--[[
 ---> 追加数据实体
 --]]
-function obj:transform_post(new_body)
+function obj:get_transform_post(new_body)
+    local content_type_value = n_req.get_headers(0)[CONTENT_TYPE]
+    local trans_type = self:get_trans_type(content_type_value)
+
+    n_req.read_body()
+    local body = n_req.get_body_data()
+
+    -- is_body_transed, body, err
+    return self:transform_headers_to_body(trans_type, new_body, body, content_type_value)
+end
+
+--[[
+---> 追加数据实体
+--]]
+function obj:transform_body(new_body)
     local method = s_lower(n_req.get_method())
 
     if method == "get" then
@@ -164,24 +283,8 @@ function obj:transform_post(new_body)
             
         return true
     else
-        local content_type_value = n_req.get_headers(0)[CONTENT_TYPE]
-        if not content_type_value then
-            content_type_value = DEFAULT_CONTENT_TYPE_VALUE
-            n_req.set_header(CONTENT_TYPE, content_type_value)
-        end
-
-        n_req.read_body()
-        local body = n_req.get_body_data()
-
-        local trans_type = match_trans_type(content_type_value)
-        local is_body_transed, body, err = self:transform_headers_to_body(trans_type, new_body, body, content_type_value)
+        local is_body_transed, body, err = self:get_transform_post(new_body)
         
--- n_log(n_err, "---------------------------------------------")
--- n_log(n_err, is_body_transed)
--- n_log(n_err, body)
--- n_log(n_err, err)
--- n_log(n_err, content_type_value)
--- n_log(n_err, "---------------------------------------------")
         if is_body_transed and not err then
             n_req.set_body_data(body)
             n_req.set_header(CONTENT_LENGTH, s_len(body))

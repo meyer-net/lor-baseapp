@@ -160,13 +160,20 @@ end
     local dest = { a = 1, b = 2 }
     u_table.merge(source, dest)
     -- dest = { a = 1, b = 2, c = 3, d = 4 }
-    
+    u_table.merge({
+                    payload = ident_payload
+                  }, http_uri_args)
 -- @param dest 目标表格(t表示是table)
 -- @param source 来源表格(t表示是table)
 --]]
 function _M.merge( source, dest )
     source = source or {}
-    local merge = _M.clone(dest) or {}
+    
+    if _M.is_empty(dest) then
+        return source
+    end
+
+    local merge = _M.clone(dest)
     
     for k, v in pairs(source) do
         merge[k] = v
@@ -181,6 +188,19 @@ end
 --function _M.()
     -- body
 --end
+
+-- https://blog.csdn.net/humanxing/article/details/42318213
+-- local SWITCH_METATABLE = {
+-- 	__index = function(t, k) 
+-- 		return rawget(t, "__default")
+-- 	end,
+-- }
+-- function SwitchGenerator(tbl)
+-- 	tbl = tbl or {}
+-- 	setmetatable(tbl, SWITCH_METATABLE)
+-- 	return function(case)
+-- 		return tbl[case]()
+-- 	end, tbl
 
 -----------------------------------------------------------------------------------------------------------------
 

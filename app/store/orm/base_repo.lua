@@ -232,6 +232,7 @@ end
 --]]
 function model:find_all(attr, slt)
 	local cond, params = self:resolve_attr(attr, slt)
+	
 	return self._adapter.current_model.find_all(cond, t_unpack(params))
 end
 

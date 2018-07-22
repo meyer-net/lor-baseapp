@@ -76,7 +76,7 @@ end
 --------------------------------------------------------------------------
 
 -- 加载下游配置文件
-function handler:_load_remote(node, url, args)
+function handler:_load_remote(node, method, headers, url, args)
 
     -- local content_type = ngx.req.get_headers(0)["Content-Type"]
     -- ngx.req.set_header("Content-Type", "application/x-www-form-urlencoded")
@@ -94,26 +94,28 @@ function handler:_load_remote(node, url, args)
 
     args = self.utils.json.encode(args)
     -- args = u_json.to_url_param(args)
+    headers["content-length"] = string.len(args)
     local res, err = http:request_uri(url, {
-        method = "POST",
+        method = method,
         body = args,
-        headers = {
-            ["Content-Type"] = "application/json;charset=utf-8"
-            -- ["Content-Type"] = "application/x-www-form-urlencoded",
-        }
+        headers = headers
     })
 
-    local body = res and res.body
+    local body = ""
+    if res then
+        body = res.body
+        ngx.status = res.status
+    end
 
     if not self.utils.object.check(body) or err then
         self._log.err("[%s-match-%s:error]communication -> url: %s, args: %s, status: %s, err: %s, resp: %s", self._name, node, url, args, res and res.status, err, body)
-        return { res = false, status = status, node = node, msg = err, ec = self.utils.ex.error.EVENT_CODE.api_err }
+        return { res = false, status = ngx.status, node = node, msg = err, ec = self.utils.ex.error.EVENT_CODE.api_err }
     end
     
     local resp_body = self.utils.json.decode(body)
     if not self.utils.object.check(resp_body) then
         self._log.err("[%s-match-%s:error]parse json from url: '%s' faild, maybe the url is wrong or the resp it's not formated -> refer to resp: %s", self._name, node, url, body)
-        return { res = false, node = node, msg = "body can't decode", ec = self.utils.ex.error.EVENT_CODE.api_err }
+        return { res = false, status = ngx.status, node = node, msg = "body can't decode", ec = self.utils.ex.error.EVENT_CODE.api_err }
     end
 
     return resp_body
@@ -130,7 +132,8 @@ function handler:_get_print_from_ctrl(ctrl_conf, else_conf, ignore_event_code)
         return {
             res = false,
             ec = self.utils.ex.error.EVENT_CODE.api_err,
-            msg = s_format("服务器升级中，请稍后再试。%s", ctrl_conf.msg or ""),
+            msg = "服务器升级中，请稍后再试",
+            desc = ctrl_conf.msg,
             status = ctrl_conf.status
         }
     end
@@ -182,7 +185,7 @@ function handler:_filter_rules(sid, pass_func)
     for i, rule in ipairs(rules) do
         if rule.enable == true then
             -- judge阶段
-            local pass = u_judge.judge_rule(rule, self._name)
+            local pass, matched = u_judge.judge_rule(rule, self._name)
 
             -- extract阶段
             local variables = u_extractor.extract_variables(rule.extractor)
@@ -193,7 +196,7 @@ function handler:_filter_rules(sid, pass_func)
                 self:rule_log_info(is_log, s_format("[MATCH-RULE] %s, host: %s, uri: %s", rule.name, n_var.host, n_var.request_uri))
                 
                 if pass_func then
-                    pass_func(rule, variables)
+                    pass_func(rule, variables, matched)
                 end
 
                 return true
@@ -212,7 +215,7 @@ function handler:get_name()
     return self._name
 end
 
-function handler:exec_action( rule_pass_func )
+function handler:exec_action( rule_pass_func, rule_failure_func )
     local enable = self._cache:get(s_format("%s.enable", self._name))
     local meta = self._cache:get_json(s_format("%s.meta", self._name))
     local selectors = self._cache:get_json(s_format("%s.selectors", self._name))
@@ -236,7 +239,7 @@ function handler:exec_action( rule_pass_func )
             local is_log = selector.handle and selector.handle.log == true
             if selector_pass then
                 self:rule_log_info(is_log, s_format("[PASS-SELECTOR: %s] %s", sid, n_var.uri))
-                local stop = self:_filter_rules(sid, rule_pass_func)
+                local stop = self:_filter_rules(sid, rule_pass_func, rule_failure_func)
                 if stop then -- 不再执行此插件其他逻辑
                     return
                 end

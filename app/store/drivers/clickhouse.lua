@@ -41,8 +41,8 @@ local open = function(conf)
             conn = http;
             query = function(self, str)
                 local ident_path = "/"
-                if conf.user and conf.password then
-                    ident_path = s_format("%s?user=%s&password=%s", ident_path, conf.user, conf.password)
+                if conf.user then
+                    ident_path = s_format("%s?user=%s&password=%s", ident_path, conf.user, conf.password or "")
                 end
 
                 local res, err = http:request({

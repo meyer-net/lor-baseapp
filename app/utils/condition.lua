@@ -6,6 +6,7 @@ local n_err = ngx.ERR
 local s_format = string.format
 local s_find = string.find
 local s_lower = string.lower
+local s_sub = string.sub
 local ngx_re_find = ngx.re.find
 
 -- 创建一个用于返回操作类的基准对象
@@ -21,12 +22,14 @@ local function assert_condition(real, operator, expected)
 
     local switch = { 
         ['match'] = function()
-            if ngx_re_find(real, expected, 'isjo') ~= nil then
-                return true
+            local from, to, err = ngx_re_find(real, expected, 'isjo')
+            if from ~= nil then
+                return true, s_sub(real, from, to)
             end
         end,
         ['not_match'] = function()
-            if ngx_re_find(real, expected, 'isjo') == nil then
+            local from, to, err = ngx_re_find(real, expected, 'isjo')
+            if from == nil then
                 return true
             end
         end,
@@ -80,10 +83,11 @@ local function assert_condition(real, operator, expected)
 
     local action = switch[operator]
     if not action then 
-        return false
+        return false, real
     end
 
-    return action()
+    local result, match = action()
+    return result, match or real
 end
 
 ---> 上下文 操作区域 --------------------------------------------------------------------------------------------

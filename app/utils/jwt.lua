@@ -122,6 +122,10 @@ function _obj:load(jwt, csrf_token)
         local jwt_model = r_jwt:load_jwt(jwt)
         local client_host = self._request:get_client_host()
         local payload = jwt_model.payload
+        if not u_object.check(payload) then
+            return false, EVENT_CODE.jwt_err
+        end
+
         secret = self:gen_secret(payload.iss, payload.aud, payload.jti)
         local jwt_verified = r_jwt:verify_jwt_obj(secret, jwt_model)
         

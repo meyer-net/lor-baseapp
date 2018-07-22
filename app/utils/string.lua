@@ -189,8 +189,9 @@ end
 --[[
 ---> 
 --]]
-function _M.ltrim(source)
-    return s_gsub(source, "^[ \t\n\r]+", "")
+function _M.ltrim(source, starts)
+    starts = starts or "\t\n\r"
+    return s_gsub(source, "^[ "..starts.."]+", "")
 end
 
 --[[
