@@ -26,7 +26,7 @@ local xpcall = xpcall
 --]]
 --------------------------------------------------------------------------
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local m_base = require("app.model.base_model")
 
 -----> 工具引用
 -- local u_object = require("app.utils.object")
@@ -40,7 +40,7 @@ local c_json = require("app.utils.json")
 --[[
 ---> 当前对象
 --]]
-local model = l_object:extend()
+local model = m_base:extend()
 
 --[[
 ---> 实例构造器
@@ -48,8 +48,11 @@ local model = l_object:extend()
 --]]
 function model:new(conf, store, name)
 	-- 指定名称
-    self._name = (name or "plugin") .. "-repository-model"
+    self._name = ( name or "plugin") .. "-repository-model"
     self._desc = "store access & local cache manage"
+    
+    -- 传导值进入父类
+    model.super.new(self, conf, store, name)
     
     -- 用于操作缓存与DB的对象
     self._store = store
@@ -77,6 +80,23 @@ function model:get_selector(plugin, selector_id)
 
     if not err and selector and type(selector) == "table" and #selector > 0 then
         return selector[1]
+    end
+
+    return nil
+end
+
+function model:get_rule(plugin, rule_id)
+    if not rule_id or rule_id == "" or type(rule_id) ~= "string" then
+        return nil
+    end
+
+    local rule, err = self._adapter.current_db.query({
+        sql = "select * from " .. plugin .. " where `key` = ? and `type` = ? limit 1",
+        params = { rule_id, "rule" }
+    })
+
+    if not err and rule and type(rule) == "table" and #rule > 0 then
+        return rule[1]
     end
 
     return nil

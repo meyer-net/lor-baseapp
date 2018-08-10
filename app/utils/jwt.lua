@@ -16,7 +16,7 @@ local n_debug = ngx.DEBUG
 --------------------------------------------------------------------------
 
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local u_base = require("app.utils.base")
 
 -----> 工具引用
 local r_jwt = require("resty.jwt")
@@ -33,15 +33,19 @@ local c_json = require("cjson.safe")
 --[[
 ---> 当前对象
 --]]
-local _obj = l_object:extend()
+local _obj = u_base:extend()
 
 --[[
 ---> 实例构造器
 ------> 子类构造器中，必须实现 _obj.super.new(self, self._name, self._cache)
 --]]
 function _obj:new(name, cache)
-    self._name = s_format("[%s]-jwt", name or self._name)
-    self._request = u_request(self._name)
+    local name = s_format("[%s]-jwt", name or self._name)
+
+	-- 传导至父类填充基类操作对象
+    _obj.super.new(self, name)
+
+    self._request = u_request(name)
     self._cache = cache
 end
 

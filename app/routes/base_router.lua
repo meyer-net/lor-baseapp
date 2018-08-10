@@ -19,8 +19,7 @@ local pairs = pairs
 local xpcall = xpcall
 
 local n_log = ngx.log
-local n_err = ngx.ERR
-local n_info = ngx.INFO
+local n_alert = ngx.ALERT
 local n_debug = ngx.DEBUG
 
 local s_lower = string.lower
@@ -34,7 +33,8 @@ local s_format = string.format
 --------------------------------------------------------------------------
 -----> 基础库引用
 local lor = require("lor.index")
-local l_object = require("app.lib.classic")
+local m_base = require("app.model.base_model")
+local p_default = require("app.plugins.default_api")
 local common_api = require("app.plugins.common_api")
 
 -----------------------------------------------------------------------------------------------------------------
@@ -42,19 +42,20 @@ local common_api = require("app.plugins.common_api")
 --[[
 ---> 当前对象
 --]]
-local model = l_object:extend()
+local model = m_base:extend()
 
 --[[
 ---> 实例构造器
 ------> 子类构造器中，必须实现 model.super.new(self, store, self._name)
 --]]
 function model:new(conf, store, name)
-    self._name = name
-
-    -- 用于操作缓存与DB的对象
-    self._conf = conf
-    self._store = store
-    self._cache = self._store.cache.using
+    self._name = ( name or "anonymity" ) .. ".router"
+    
+    -- 传导值进入父类
+    model.super.new(self, conf, store, name)
+    
+    -- 专用于插件的缓存
+    self._plugin_cache = self._store.plugin
 end
 
 -----------------------------------------------------------------------------------------------------------------
@@ -67,17 +68,18 @@ local function fill_plugin_api(conf, store, plugin, router)
     ok = xpcall(function() 
         plugin_api = require(plugin_api_namespace)
     end, function()
-        ex = debug.traceback()
+        -- 开启默认的api
+        -- ex = debug.traceback()
+        plugin_api = p_default
+        
+        n_log(n_alert, s_format("plugin's api of '%s' can not load, reset to 'default'", plugin_api_namespace))
     end)
 
-    if not ok or not plugin_api or type(plugin_api) ~= "table" then
-        n_log(n_err, s_format("plugin's api of '%s' load error, %s -> ", plugin_api_namespace, ex))
-        return
+    local current_api = plugin_api(conf, store, plugin)
+    if plugin ~= "stat" then
+        local common_apis = common_api(conf, store, plugin)
+        current_api:merge_apis(common_apis)
     end
-
-    local common_apis = common_api(conf, store, plugin)
-    local current_api = plugin_api(plugin)
-    current_api:merge_apis(common_apis)
     
     local plugin_apis = current_api:get_apis()
     for uri, api_methods in pairs(plugin_apis) do
@@ -101,7 +103,7 @@ function model:load_router(router_func)
 
     local available_plugins = self._conf.plugins
     if not available_plugins or type(available_plugins) ~= "table" or #available_plugins<1 then
-        n_log(n_err, "no available plugins, maybe you should check `sys.conf`.")
+        self._log.err("no available plugins, maybe you should check `sys.conf`.")
     else
         for _, plugin in ipairs(available_plugins) do
             fill_plugin_api(self._conf, self._store, plugin, router)
@@ -118,7 +120,7 @@ function model:load_plugins()
         local tmp
         if v ~= "kvstore" then
             tmp = {
-                enable =  self._cache:get(v .. ".enable"),
+                enable =  self._plugin_cache:get(v .. ".enable"),
                 name = v,
                 active_selector_count = 0,
                 inactive_selector_count = 0,
@@ -126,12 +128,12 @@ function model:load_plugins()
                 inactive_rule_count = 0
             }
             
-            local plugin_selectors = self._cache:get_json(v .. ".selectors")
+            local plugin_selectors = self._plugin_cache:get_json(v .. ".selectors")
             if plugin_selectors then
                 for sid, s in pairs(plugin_selectors) do
                     if s.enable == true then
                         tmp.active_selector_count = tmp.active_selector_count + 1
-                        local selector_rules = self._cache:get_json(v .. ".selector." .. sid .. ".rules")
+                        local selector_rules = self._plugin_cache:get_json(v .. ".selector." .. sid .. ".rules")
                         for _, r in ipairs(selector_rules) do
                             if r.enable == true then
                                 tmp.active_rule_count = tmp.active_rule_count + 1
@@ -146,7 +148,7 @@ function model:load_plugins()
             end
         else
             tmp = {
-                enable =  (v=="stat") and true or (self._cache:get(v .. ".enable") or false),
+                enable =  (v=="stat") and true or (self._plugin_cache:get(v .. ".enable") or false),
                 name = v
             }
         end

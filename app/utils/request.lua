@@ -42,7 +42,7 @@ local n_info = ngx.INFO
 local n_debug = ngx.DEBUG
 
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local u_base = require("app.utils.base")
 
 -----> 工具引用
 local u_each = require("app.utils.each")
@@ -58,14 +58,17 @@ local c_json = require("cjson.safe")
 --[[
 ---> 当前对象
 --]]
-local obj = l_object:extend()
+local _obj = u_base:extend()
 
 --[[
 ---> 实例构造器
 ------> 子类构造器中，必须实现 api.super.new(self, self._name)
 --]]
-function obj:new(name)
-    self._name = s_format("[%s]-request", name or self._name)
+function _obj:new(name)
+    local name = s_format("[%s]-request", name or self._name)
+
+	-- 传导至父类填充基类操作对象
+    _obj.super.new(self, name)
 end
 
 ---> 上下文 公有变量 ---------------------------------------------------------------------------------------------
@@ -112,7 +115,7 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-function obj:transform_headers_to_body (trans_type, new_body, body, content_type_value)
+function _obj:transform_headers_to_body (trans_type, new_body, body, content_type_value)
     body = body and body or ""
     new_body = new_body or {}
     local content_length = s_len(body)
@@ -193,7 +196,7 @@ end
 ---> 数据转换为JSON
 in: body -> string
 --]]
-function obj:get_transform_json(body)
+function _obj:get_transform_json(body)
     local args = {}
     --判断是否是multipart/form-data类型的表单      
     local content_type_value = n_req.get_headers(0)[CONTENT_TYPE]
@@ -247,7 +250,7 @@ end
 --[[
 ---> 获取类型
 --]]
-function obj:get_trans_type(content_type_value)
+function _obj:get_trans_type(content_type_value)
     if not content_type_value then
         content_type_value = DEFAULT_CONTENT_TYPE_VALUE
         n_req.set_header(CONTENT_TYPE, content_type_value)
@@ -259,7 +262,7 @@ end
 --[[
 ---> 追加数据实体
 --]]
-function obj:get_transform_post(new_body)
+function _obj:get_transform_post(new_body)
     local content_type_value = n_req.get_headers(0)[CONTENT_TYPE]
     local trans_type = self:get_trans_type(content_type_value)
 
@@ -273,7 +276,7 @@ end
 --[[
 ---> 追加数据实体
 --]]
-function obj:transform_body(new_body)
+function _obj:transform_body(new_body)
     local method = s_lower(n_req.get_method())
 
     if method == "get" then
@@ -297,7 +300,7 @@ end
 --[[
 ---> 获取客户端真实ID
 --]]
-function obj:get_client_host()
+function _obj:get_client_host()
     local headers = n_req.get_headers()  
     return headers["X-REAL-IP"] or headers["X_FORWARDED_FOR"] or ngx.var.remote_addr or "0.0.0.0"
 end
@@ -305,7 +308,7 @@ end
 --[[
 ---> 判断请求协议
 --]]
-function obj:is_https_protocol()
+function _obj:is_https_protocol()
     -- local server_protocol = n_var.server_protocol
     -- n_log(n_err, server_protocol:lower())
     -- return server_protocol and (match_return(server_protocol:lower(), "https", true) or false)
@@ -315,7 +318,7 @@ end
 --[[
 ---> 获取客户端浏览器类型
 --]]
-function obj:get_client_type()
+function _obj:get_client_type()
     -- 99% 前三个都能匹配上吧
     local arr_mobile = {
         "phone",
@@ -360,7 +363,7 @@ end
 --[[
 ---> 获取请求uri的扩展名
 --]]
-function obj:get_ext_by_uri(uri)
+function _obj:get_ext_by_uri(uri)
     uri = uri or n_var.uri
     local uri_ext_match, uri_ext_err = ngx.re.match(uri, '(\\.(\\w+)\\?)|(\\.(\\w+)$)')
     return (uri_ext_match and not uri_ext_err) and uri_ext_match[0]
@@ -369,7 +372,7 @@ end
 --[[
 ---> 依据扩展名获取CONTENT-TYPE类型
 --]]
-function obj:get_content_type_by_ext(ext)
+function _obj:get_content_type_by_ext(ext)
     local ext_ct_dict = {
         [".html"] = "text/html", 
         [".htm"] = "text/html", 
@@ -482,7 +485,7 @@ end
 --[[
 ---> 获取静态的CONTENT-TYPE类型
 --]]
-function obj:get_static_content_type()
+function _obj:get_static_content_type()
     local content_type_value = n_req.get_headers(0)[CONTENT_TYPE] or self:get_content_type_by_ext(self:get_ext_by_uri())
     if not u_object.check(content_type_value) then
         return ""
@@ -580,10 +583,10 @@ end
 --[[
 ---> 
 --]]
---function obj:()
+--function _obj:()
     -- body
 --end
 
 -----------------------------------------------------------------------------------------------------------------
 
-return obj
+return _obj

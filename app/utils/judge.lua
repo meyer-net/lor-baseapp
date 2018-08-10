@@ -131,7 +131,7 @@ end
 
 function _M.judge_rule(rule, plugin_name)
     if not rule or not rule.judge then return false end
-
+    
     local judge = rule.judge
     local judge_type = judge.type
     local conditions = judge.conditions

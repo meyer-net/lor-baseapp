@@ -1,7 +1,6 @@
 -- 自定义函数指针
 local type = type
 
-local c_json = require("cjson.safe")
 local u_each = require("app.utils.each")
 local s_cache = require("app.store.cache.base_cache")
 
@@ -30,7 +29,7 @@ end
 function _obj:set_by_json(list, timeout)
 	local ok,err,effect_len,forcible = "","",0,""
 	timeout = _obj.filter_timeout(timeout, 0)
-	local json_obj = c_json.decode(list)
+	local json_obj = self.utils.json.decode(list)
 	u_each.json_action(json_obj, function(k,v)
 		ok,err,forcible = self.store:set(k, v, timeout)
 
@@ -38,7 +37,7 @@ function _obj:set_by_json(list, timeout)
 			effect_len = effect_len + 1
 		end
 	end)
-
+	
 	return ok,err,effect_len,forcible
 end
 
@@ -60,6 +59,7 @@ end
 function _obj:get(key)
 	local status,value,effect_len = "OK",nil,0
 	local value,err = self.store:get(key)
+	
 	if not value then
 		status = "FAILURE"
 	else

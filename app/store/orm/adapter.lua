@@ -113,7 +113,7 @@ local n_debug = ngx.DEBUG
 --]]
 --------------------------------------------------------------------------
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local u_base = require("app.utils.base")
 
 -----> 引擎引用
 local o_query = require("app.store.orm.query")
@@ -135,7 +135,7 @@ local namespace = "app.store.orm.adapter"
 --[[
 ---> 当前对象
 --]]
-local _adapter = l_object:extend()
+local _adapter = u_base:extend()
 
 --[[
 ---> 实例构造器
@@ -143,7 +143,10 @@ local _adapter = l_object:extend()
 --]]
 function _adapter:new(conf)
     -- 指定名称
-    self._name = conf.name or namespace
+    local name = conf.name or namespace
+
+	-- 传导至父类填充基类操作对象
+    _adapter.super.new(self, name)
 
     -- 用于操作具体驱动的配置文件
     self.conf = conf

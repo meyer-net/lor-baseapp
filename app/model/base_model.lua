@@ -24,7 +24,7 @@ local _model = u_base:extend()
 ------> 子类构造器中，必须实现 model.super.new(self, conf, store, name)
 --]]
 function _model:new(conf, store, name, opts)
-    name = name or ( self._source or "anonymity") .. ".model"
+    name = name or ( self._source or "anonymity" ) .. ".model"
 
 	-- 传导至父类填充基类操作对象
     _model.super.new(self, name, opts)
@@ -34,6 +34,9 @@ function _model:new(conf, store, name, opts)
 
     -- 仓储器
     self._store = store
+
+    -- 缓存
+    self._cache = self._store.cache.using
 
     -- 锁对象
     self._locker = u_locker(self._store.cache.nginx["sys_locker"], self._name)

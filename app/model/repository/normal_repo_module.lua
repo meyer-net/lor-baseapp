@@ -30,7 +30,7 @@ local s_format = string.format
 --]]
 --------------------------------------------------------------------------
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local m_base = require("app.model.base_model")
 
 -----> 工具引用
 --local u_object = require("app.utils.object")
@@ -44,15 +44,18 @@ local l_object = require("app.lib.classic")
 --[[
 ---> 当前对象
 --]]
-local model = l_object:extend()
+local model = m_base:extend()
 
 --[[
 ---> 实例构造器
 ------> 子类构造器中，必须实现 model.super.new(self, store, self._name)
 --]]
-function model:new(config, store, name)
+function model:new(conf, store, name)
 	-- 指定名称
-    self._name = (name or "anonymity") .. "-repository-model"
+    self._name = ( name or "anonymity" ) .. "-repository-model"
+    
+    -- 传导值进入父类
+    model.super.new(self, conf, store, name)
     
     -- 用于操作缓存与DB的对象
     self._store = store

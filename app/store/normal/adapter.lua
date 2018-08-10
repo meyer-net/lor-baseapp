@@ -35,7 +35,7 @@ local s_store = require("app.store.base_store")
 --]]
 --------------------------------------------------------------------------
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local u_base = require("app.utils.base")
 
 -----> 引擎引用
 local o_query = require("app.store.normal.query")
@@ -53,14 +53,17 @@ local namespace = "app.store.normal.adapter"
 
 -----------------------------------------------------------------------------------------------------------------
 
-local _adapter = s_store:extend()
+local _adapter = u_base:extend()
 
 --[[
 ---> 初始化构造器
 --]]
 function _adapter:new(conf)
     -- 指定名称
-    self._name = conf.name or namespace
+    local name = conf.name or namespace
+
+	-- 传导至父类填充基类操作对象
+    _adapter.super.new(self, name)
 
     -- 用于操作具体驱动的配置文件
     self.conf = conf

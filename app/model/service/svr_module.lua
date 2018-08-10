@@ -28,7 +28,7 @@ local n_debug = ngx.DEBUG
 --]]
 --------------------------------------------------------------------------
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local m_base = require("app.model.base_model")
 
 -----> 工具引用
 local u_object = require("app.utils.object")
@@ -45,23 +45,26 @@ local r_model = require("app.model.repository.model_repo")
 --[[
 ---> 当前对象
 --]]
-local model = l_object:extend()
+local model = m_base:extend()
 
 --[[
 ---> 实例构造器
 ------> 子类构造器中，必须实现 model.super.new(self, store, self._name)
 --]]
-function model:new(config, store, name)
+function model:new(conf, store, name)
 	-- 指定名称
     self._source = "[user]"
-    self._name = (name or self._source) .. "-svr-model"
+    self._name = ( name or self._source) .. "-svr-model"
+    
+    -- 传导值进入父类
+    model.super.new(self, conf, store, name)
     
     -- 用于操作缓存与DB的对象
     self.store = store
 
     -- 当前临时操作数据的仓储
     self.model = {
-    	current_repo = r_model(config, store, self._source),
+    	current_repo = r_model(conf, store, self._source),
     	ref_repo = {
 
     	}
@@ -71,7 +74,7 @@ function model:new(config, store, name)
     -- self.locker = u_locker(self.store.cache.nginx["sys_locker"], "lock-tag-name")
 
 	-- 位于在缓存中维护的KEY值
-    self.cache_prefix = s_format("%s.app<%s> => ", config.project_name, self._name)
+    self.cache_prefix = s_format("%s.app<%s> => ", conf.project_name, self._name)
 end
 
 -----------------------------------------------------------------------------------------------------------------

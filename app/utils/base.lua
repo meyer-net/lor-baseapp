@@ -17,7 +17,14 @@ local require = require
 local type = type
 
 local n_log = ngx.log
+
+local n_stderr = ngx.STDERR
+local n_emerg = ngx.EMERG
+local n_alert = ngx.ALERT
+local n_crit = ngx.CRIT
 local n_err = ngx.ERR
+local n_warn = ngx.WARN
+local n_notice = ngx.NOTICE
 local n_info = ngx.INFO
 local n_debug = ngx.DEBUG
 
@@ -77,19 +84,35 @@ function _obj:new(name, opts)
     -- 选项设定
     self._slog = {
         log = function ( level, fmt, ... )
-            return n_log(level, _obj.read_format(fmt, ...))
-        end,
-        err = function (fmt, ...)
-            return n_log(n_err, _obj.read_format(fmt, ...))
-        end,
-
-        info = function (fmt, ...)
-            return n_log(n_info, _obj.read_format(fmt, ...))
-        end,
-
-        debug = function (fmt, ...)
-            return n_log(n_debug, _obj.read_format(fmt, ...))
-        end
+                return n_log(level, _obj.read_format(fmt, ...))
+            end,
+        stderr  = function (fmt, ...)
+                return n_log(n_stderr, _obj.read_format(fmt, ...))
+            end,
+        emerg  = function (fmt, ...)
+                return n_log(n_emerg, _obj.read_format(fmt, ...))
+            end,
+        alert  = function (fmt, ...)
+                return n_log(n_alert, _obj.read_format(fmt, ...))
+            end,
+        crit  = function (fmt, ...)
+                return n_log(n_crit, _obj.read_format(fmt, ...))
+            end,
+        err  = function (fmt, ...)
+                return n_log(n_err, _obj.read_format(fmt, ...))
+            end,
+        warn  = function (fmt, ...)
+                return n_log(n_warn, _obj.read_format(fmt, ...))
+            end,
+        notice  = function (fmt, ...)
+                return n_log(n_notice, _obj.read_format(fmt, ...))
+            end,
+        info  = function (fmt, ...)
+                return n_log(n_info, _obj.read_format(fmt, ...))
+            end,
+        debug  = function (fmt, ...)
+                return n_log(n_debug, _obj.read_format(fmt, ...))
+            end
     }
 
     self._log = (opts and opts.log) or self._slog

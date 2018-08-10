@@ -3,6 +3,7 @@ local ipairs = ipairs
 local type = type
 local setmetatable = setmetatable
 local getmetatable = getmetatable
+local t_insert = table.insert
 
 -- 创建一个用于返回操作类的基准对象
 local _M = {}
@@ -175,8 +176,16 @@ function _M.merge( source, dest )
 
     local merge = _M.clone(dest)
     
-    for k, v in pairs(source) do
-        merge[k] = v
+    if not _M.is_array(source) then
+        for k, v in pairs(source) do
+            merge[k] = v
+        end
+    else
+        for _, v in ipairs(source) do
+            if not _M.contains(merge, v) then
+                t_insert(merge, v)
+            end
+        end
     end
 
     return merge

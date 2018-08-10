@@ -1,18 +1,8 @@
 -- 自定义函数指针
 local type = type
-local n_log = ngx.log
-local n_err = ngx.ERR
-local n_debug = ngx.DEBUG
-
-local s_format = string.format
 
 -- 统一引用导入LIBS
-local c_json = require("cjson.safe")
 local r_lock = require("resty.lock")
-
-local u_object = require("app.utils.object")
-local u_each = require("app.utils.each")
-local u_table = require("app.utils.table")
 
 local s_store = require("app.store.base_store")
 local s_adapter = require("app.store.cache_adapter")
@@ -31,7 +21,7 @@ _obj.support_types = { "nginx", "redis" }
 --]]
 function _obj:new(options)
     self._VERSION = '0.02'
-    self._name = s_format("%s-%s-cache", options.store_group, (options and options.name or "anonymity"))
+    self._name = self.format("%s-%s-cache", options.store_group, (options and options.name or "anonymity" ))
     self._locker_name = ( options and options.locker_name ) or "sys_locker"
 
     self._store_group = options.store_group
@@ -66,10 +56,10 @@ function _obj:parse_callback( ... )
         ok = args[1]
         if ok == true then
             local orm_records = args[2]
-            if u_object.check(orm_records) then
-                if u_table.is_array(orm_records) then
+            if self.utils.object.check(orm_records) then
+                if self.utils.table.is_array(orm_records) then
                     records = {}
-                    u_each.array_action(orm_records, function(idx, record)
+                    self.utils.each.array_action(orm_records, function(idx, record)
                         records[idx] = filter_value(record)
                     end)
                 else
@@ -89,7 +79,7 @@ end
 -- 从缓存获取不存在时更新并返回
 function _obj:get_or_load(key, callback, timeout)
     local value, err = self:get(key)
-    if not u_object.check(value) then -- cache missing
+    if not self.utils.object.check(value) then -- cache missing
         -- 定义锁对象
         local lock = r_lock:new(self._locker_name)
         
@@ -98,7 +88,7 @@ function _obj:get_or_load(key, callback, timeout)
             -- 正常解锁
             local ok, err = _lock:unlock()
             if not ok then
-                n_log(n_err, "METHOD:[get_or_load.unlock] KEY:["..key.."], failed to unlock，Final: "..err)
+                self._log.err("METHOD:[get_or_load.unlock] KEY:["..key.."], failed to unlock，Final: "..err)
             end
         end
 
@@ -106,12 +96,12 @@ function _obj:get_or_load(key, callback, timeout)
         local elapsed, err = lock:lock(key) 
         if not elapsed then
             --锁超时,被自动释放,根据自己的业务情况选择后续动作  
-            n_log(n_err, "METHOD:[get_or_load.lock] KEY:["..key.."], failed to acquire the lock: "..err)
+            self._log.err("METHOD:[get_or_load.lock] KEY:["..key.."], failed to acquire the lock: "..err)
             return
         end
 
         value, err = self:get(key)  -- 2：锁定期间再次从REDIS中获取信息
-        if not u_object.check(value) then       
+        if not self.utils.object.check(value) then       
             value, err, tot = self:parse_callback(callback(key)) -- self.db:query(db_opts.query_text, db_opts.query_params)  -- 读取DB信息
 
             -- 内部传输的设置过期时间，因timeout为值类型，不能直接变更
@@ -121,49 +111,49 @@ function _obj:get_or_load(key, callback, timeout)
 
             -- 无记录报错
             if err then
-                n_log(n_err, "METHOD:[get_or_load] KEY:["..key.."], callback get data error: "..err)
+                self._log.err("METHOD:[get_or_load] KEY:["..key.."], callback get data error: "..err)
                 unlock(lock)
                 return value, err
             end
             
             local _type = type(value)
             if(_type == "table" or _type == "userdata") then 
-                value = c_json.encode(value)
+                value = self.utils.json.encode(value)
             end
 
             if value then
                 -- 设置读取值进入缓存
                 local ok,err = self:set(key, value, timeout)
                 if not ok then
-                    n_log(n_err, "METHOD:[get_or_load] KEY:["..key.."], update local error: "..err)
+                    self._log.err("METHOD:[get_or_load] KEY:["..key.."], update local error: "..err)
                 else
-                    n_log(n_debug, s_format("METHOD:[get_or_load] KEY:[%s] successed!", key))
+                    self._log.debug("METHOD:[get_or_load] KEY:[%s] successed!", key)
                 end
             else
-                n_log(n_debug, s_format("METHOD:[get_or_load] KEY:[%s], records not found!", key))
+                self._log.debug("METHOD:[get_or_load] KEY:[%s], records not found!", key)
             end
         end
         
         unlock(lock)
     end
 
-    return c_json.decode(value) or value, err
+    return self.utils.json.decode(value) or value, err
 end
 
 -- 保存到存储系统并更新本地缓存
 function _obj:save_and_update(key, value, callback, timeout)
     local ok, err = callback(key, value) -- true or false
     if ok then
-        local json_value = u_object.to_json(value)
+        local json_value = self.utils.object.to_json(value)
         ok, err = self:set(key, json_value, timeout)
         if err or not ok then
-            n_log(n_err, "METHOD:[save_and_update] KEY:["..key.."], cache update error: "..err)
+            self._log.err("METHOD:[save_and_update] KEY:["..key.."], cache update error: "..err)
             return false
         end
 
         return true
     else
-        n_log(n_err, "METHOD:[save_and_update] KEY:["..key.."], callback save error"..err)
+        self._log.err("METHOD:[save_and_update] KEY:["..key.."], callback save error"..err)
         return false
     end
 
@@ -173,16 +163,16 @@ end
 -- 更新本地缓存并保存到存储系统
 function _obj:update_and_save(key, value, callback, timeout)
     -- value, err, tot = self:parse_callback(callback(key))
-    local json_value = u_object.to_json(value)
+    local json_value = self.utils.object.to_json(value)
     local ok, err = self:set(key, json_value, timeout)
     if err or not ok then
-        n_log(n_err, "METHOD:[update_and_save] KEY:["..key.."], cache update error: "..err)
+        self._log.err("METHOD:[update_and_save] KEY:["..key.."], cache update error: "..err)
         return false
     end
     
     ok, err = callback(key, value) -- true or false
     if not ok then
-        n_log(n_err, "METHOD:[update_and_save] KEY:["..key.."], callback save error"..err)
+        self._log.err("METHOD:[update_and_save] KEY:["..key.."], callback save error"..err)
         return false
     end
 
@@ -194,12 +184,12 @@ function _obj:load_and_set(key, callback, timeout)
     local err, value = callback(key)
 
     if err or not value then
-        n_log(n_err, "METHOD:[load_and_set] KEY:["..key.."], callback load error: "..err)
+        self._log.err("METHOD:[load_and_set] KEY:["..key.."], callback load error: "..err)
         return false
     else
         local ok, errr = self:set(key, value, timeout)
         if errr or not ok then
-            n_log(n_err, "METHOD:[load_and_set] KEY:["..key.."], cache set error: ", errr)
+            self._log.err("METHOD:[load_and_set] KEY:["..key.."], cache set error: ", errr)
             return false
         end
 
@@ -214,7 +204,7 @@ end
 function _obj:get_json(key)
     local value, f = self:get(key)
     if value then
-        value = c_json.decode(value)
+        value = self.utils.json.decode(value)
     end
     return value, f
 end
@@ -224,8 +214,8 @@ function _obj:set(key, value, timeout)
 end
 
 function _obj:set_json(key, value, timeout)
-    if value then
-        value = c_json.encode(value)
+    if type(value) ~= "string" then
+        value = self.utils.json.encode(value)
     end
     return self:set(key, value, timeout)
 end
@@ -261,7 +251,7 @@ end
 -- end)
 
 -- if err then
---     n_log(n_err, s_format("METHOD:[service.%s.push.pipeline] QUEUE:[%s] failure! error: %s", self._name, queue_name, err))
+--     self._log.err("METHOD:[service.%s.push.pipeline] QUEUE:[%s] failure! error: %s", self._name, queue_name, err)
 -- end
 function _obj:pipeline_command(action)
     return self._cache:pipeline_command(action)

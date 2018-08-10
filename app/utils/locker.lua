@@ -55,7 +55,7 @@ function _obj:new(shard_dict, name)
 	self.store = shard_dict
 
 	-- 指定名称
-    self._name = (name or "anonymity") .. "-lock"
+    self._name = ( name or "anonymity" ) .. "-lock"
 end
 
 -----------------------------------------------------------------------------------------------------------------

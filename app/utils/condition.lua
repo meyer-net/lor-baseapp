@@ -152,7 +152,7 @@ function _M.judge(condition)
             real = post_params[condition.name]
         end,
         ["Referer"] = function()
-            real =  ngx.var.http_referer
+            real =  ngx.var.http_referer or ngx.var.host
         end,
         ["Host"] = function()
             real =  ngx.var.host

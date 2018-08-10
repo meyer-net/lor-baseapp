@@ -81,7 +81,7 @@ local open = function(conf)
             local tmp
             tmp, err, errno, sqlstate = db.conn:read_result()
             if not tmp then
-                err = s_format("[%s.open.query]Bad result: %s,%s,%s", namespace, err, errno, sqlstate)
+                err = s_format("[%s.open.query.again]Bad result: %s,%s,%s", namespace, err, errno, sqlstate)
                 n_log(n_err, err)
                 return false, err
             end

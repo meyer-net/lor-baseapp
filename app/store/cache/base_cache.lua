@@ -7,20 +7,22 @@ local t_insert = table.insert
 local t_remove = table.remove
 
 local u_object = require("app.utils.object")
-local l_object = require("app.lib.classic")
+local u_base = require("app.utils.base")
 
-local c_json = require("cjson.safe")
-
-local _M = l_object:extend()
+local model = u_base:extend()
 
 ------------------------------------------ 通用配置信息，使它分离出多个区域 -----------------------------------  
 
 --[[
 ---> RDS 选区
 --]]
-function _M:new(conf, name)
-    self._VERSION = '0.02'
-    self._name = name or "cache-base-store"
+function model:new(conf, name)
+	self._VERSION = '0.02'
+	
+    local name = name or "cache-base-store"
+
+	-- 传导至父类填充基类操作对象
+    model.super.new(self, name)
 
     self.config = conf
 end
@@ -28,7 +30,7 @@ end
 --[[
 ---> 过滤超时时间
 --]]
-function _M.filter_timeout( timeout , default )
+function model.filter_timeout( timeout , default )
 	local this_timeout = timeout
 	if not u_object.check(timeout) then
 		if type(default) == "number" then
@@ -50,12 +52,12 @@ end
 --[[
 ---> 缓存记录追加
 --]]
-function _M:append(key, item, limit)
+function model:append(key, item, limit)
 	local arr_temp = self:get(key)
 	if not arr_temp then
 		arr_temp = {}
 	else
-		arr_temp = c_json.decode(arr_temp)
+		arr_temp = self.utils.json.decode(arr_temp)
 	end
 
 	local arr_len = #arr_temp
@@ -65,9 +67,9 @@ function _M:append(key, item, limit)
        	t_remove(arr_temp, 1)
 	end
 
-	return self:set(key, c_json.encode(arr_temp))
+	return self:set(key, self.utils.json.encode(arr_temp))
 end
 
 -----------------------------------------------------------------------------------------------------------------
 
-return _M
+return model

@@ -23,10 +23,6 @@ local r_plugin = require("app.model.repository.plugin_repo")
 
 -------------------------------------------------- Plugins -------------------------------------------------
 
-local HEADERS = {
-    APP_LATENCY = "X-App-Latency",
-    X_Powered_By = "X-Powered-By"
-}
 
 local loaded_plugins = {}
 
@@ -41,25 +37,29 @@ local function load_plugins_handler(config, store)
     local sorted_plugins = {}
     local plugins = config.plugins
 
-    for _, v in ipairs(plugins) do
-        local loaded, plugin_handler = u_loader.load_module_if_exists("app.plugins." .. v .. ".handler")
-        if not loaded then
-            n_log(n_err, "The following plugin is not installed: " .. v)
-        else
-            n_log(n_debug, "Loading plugin: " .. v)
-            t_insert(sorted_plugins, {
-                name = v,
-                handler = plugin_handler(config, store),
-            })
+    u_each.array_action(plugins, function ( _, plugin_name )
+        if (plugin_name ~= "micros") then
+            local plugin_namespace = s_format("app.plugins.%s.handler", plugin_name)
+            local loaded, plugin_handler = u_loader.load_module_if_exists(plugin_namespace)
+            if not loaded then
+                n_log(n_err, "The following plugin is not installed: " .. plugin_name)
+            else
+                n_log(n_debug, "Loading plugin: " .. plugin_name)
+                t_insert(sorted_plugins, {
+                    name = plugin_name,
+                    handler = plugin_handler(config, store),
+                })
+            end
         end
-    end
-
-    t_sort(sorted_plugins, function(a, b)
-        local priority_a = a.handler.PRIORITY or 0
-        local priority_b = b.handler.PRIORITY or 0
-        return priority_a > priority_b
     end)
 
+    t_sort(sorted_plugins, function(a, b)
+        local priority_a = a.handler.PRIORITY or 5
+        local priority_b = b.handler.PRIORITY or 5
+        
+        return priority_a > priority_b
+    end)
+    
     return sorted_plugins
 end
 
@@ -67,16 +67,18 @@ end
 
 -------------------------------------------------- System --------------------------------------------------
 
-local _M = {}
+local _obj = {}
 
 -- 执行过程:
 -- 加载配置
 -- 实例化存储store
-function _M.init(options)
+function _obj.init(options)
     options = options or {}
     local store, config
     local status, err = pcall(function()
+        local force_plugins = {"stat", "micros", "map"}
         config = u_loader.load_config(options.config)
+        config.plugins = config.plugins and u_table.merge(config.plugins, force_plugins) or config.plugins
 
         ctx_store = {
             db = { },
@@ -217,7 +219,7 @@ function _M.init(options)
         os.exit(1)
     end
 
-    _M.data = {
+    _obj.data = {
         store = ctx_store,
         config = config
     }
@@ -225,7 +227,7 @@ function _M.init(options)
     return config, ctx_store
 end
 
-function _M.init_worker()
+function _obj.init_worker()
     -- 仅在 init_worker 阶段调用，初始化随机因子，仅允许调用一次
     math.randomseed(tostring(ngx.now()*1000):reverse())
 
@@ -233,14 +235,14 @@ function _M.init_worker()
     local worker_id = ngx.worker.id()
     if worker_id == 0 then
         local ok, err = ngx.timer.at(0, function(premature, store, config)
-            local current_repo = r_plugin(_M.data.config, _M.data.store)
+            local current_repo = r_plugin(_obj.data.config, _obj.data.store)
             u_each.array_action(config.plugins, function (_, plugin)
                 local load_success = current_repo:load_data_by_db(plugin)
                 if not load_success then
                     os.exit(1)
                 end
             end)
-        end, _M.data.store, _M.data.config)
+        end, _obj.data.store, _obj.data.config)
 
         if not ok then
             ngx.log(ngx.ERR, "failed to create the timer: ", err)
@@ -248,29 +250,29 @@ function _M.init_worker()
         end
     end
 
-    for _, plugin in ipairs(loaded_plugins) do
-        plugin.handler:init_worker()
-    end
+    u_each.array_action(loaded_plugins, function ( _, plugin )
+        return plugin.handler:init_worker()
+    end)
 end
 
-function _M.redirect()
+function _obj.redirect()
     ngx.ctx.APP_REDIRECT_START = now()
 
-    for _, plugin in ipairs(loaded_plugins) do
-        plugin.handler:redirect()
-    end
+    u_each.array_action(loaded_plugins, function ( _, plugin )
+        return plugin.handler:redirect()
+    end)
 
     local now = now()
     ngx.ctx.APP_REDIRECT_TIME = now - ngx.ctx.APP_REDIRECT_START
     ngx.ctx.APP_REDIRECT_ENDED_AT = now
 end
 
-function _M.rewrite()
+function _obj.rewrite()
     ngx.ctx.APP_REWRITE_START = now()
 
-    for _, plugin in ipairs(loaded_plugins) do
-        plugin.handler:rewrite()
-    end
+    u_each.array_action(loaded_plugins, function ( _, plugin )
+        return plugin.handler:rewrite()
+    end)
 
     local now = now()
     ngx.ctx.APP_REWRITE_TIME = now - ngx.ctx.APP_REWRITE_START
@@ -278,12 +280,12 @@ function _M.rewrite()
 end
 
 
-function _M.access()
+function _obj.access()
     ngx.ctx.APP_ACCESS_START = now()
 
-    for _, plugin in ipairs(loaded_plugins) do
-        plugin.handler:access()
-    end
+    u_each.array_action(loaded_plugins, function ( _, plugin )
+        return plugin.handler:access()
+    end)
 
     local now = now()
     ngx.ctx.APP_ACCESS_TIME = now - ngx.ctx.APP_ACCESS_START
@@ -291,7 +293,11 @@ function _M.access()
     ngx.ctx.ACCESSED = true
 end
 
-function _M.header_filter()
+function _obj.header_filter()
+    local HEADERS = {
+        APP_LATENCY = "X-App-Latency",
+        X_Powered_By = "X-Powered-By"
+    }
 
     if ngx.ctx.ACCESSED then
         local now = now()
@@ -299,21 +305,21 @@ function _M.header_filter()
         ngx.ctx.APP_HEADER_FILTER_STARTED_AT = now
     end
 
-    for _, plugin in ipairs(loaded_plugins) do
-        plugin.handler:header_filter()
-    end
+    u_each.array_action(loaded_plugins, function ( _, plugin )
+        return plugin.handler:header_filter()
+    end)
 
     if ngx.ctx.ACCESSED then
         ngx.header[HEADERS.APP_LATENCY] = ngx.ctx.APP_WAITING_TIME
     end
 
-    ngx.header[HEADERS.X_Powered_By] = (_M.data.config.company or "Meyer") .. " OShit Team"
+    ngx.header[HEADERS.X_Powered_By] = (_obj.data.config.company or "Meyer") .. " OShit Team"
 end
 
-function _M.body_filter()
-    for _, plugin in ipairs(loaded_plugins) do
-        plugin.handler:body_filter()
-    end
+function _obj.body_filter()
+    u_each.array_action(loaded_plugins, function ( _, plugin )
+        return plugin.handler:body_filter()
+    end)
 
     local now = now()
     if ngx.ctx.ACCESSED then
@@ -321,12 +327,12 @@ function _M.body_filter()
     end
 end
 
-function _M.log()
-    for _, plugin in ipairs(loaded_plugins) do
-        plugin.handler:log()
-    end
+function _obj.log()
+    u_each.array_action(loaded_plugins, function ( _, plugin )
+        return plugin.handler:log()
+    end)
 end
 
 -------------------------------------------------- ------ --------------------------------------------------
 
-return _M
+return _obj

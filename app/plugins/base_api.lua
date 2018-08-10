@@ -35,21 +35,25 @@ local s_format = string.format
 --]]
 --------------------------------------------------------------------------
 -----> 基础库引用
-local l_object = require("app.lib.classic")
+local m_base = require("app.model.base_model")
 
 -----------------------------------------------------------------------------------------------------------------
 
 --[[
 ---> 当前对象
 --]]
-local api = l_object:extend()
+local api = m_base:extend()
 
 --[[
 ---> 实例构造器
 ------> 子类构造器中，必须实现 api.super.new(self, self._name)
 --]]
-function api:new(name)
+function api:new(conf, store, name)
     self._name = s_format("[%s]-api", name)
+    
+    -- 传导值进入父类
+    api.super.new(self, conf, store, name)
+
     self._apis = {}
 	self._plugin = name
     self:build_method()

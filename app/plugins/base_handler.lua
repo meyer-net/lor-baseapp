@@ -31,10 +31,6 @@ local r_http = require("resty.http")
 -----> 工具引用
 local m_base = require("app.model.base_model")
 local u_request = require("app.utils.request")
--- local u_json = require("app.utils.json")
-local u_judge = require("app.utils.judge")
-local u_extractor = require("app.utils.extractor")
---
 
 -----> 外部引用
 --
@@ -43,7 +39,7 @@ local u_extractor = require("app.utils.extractor")
 --
 
 -----> 业务引用
---
+local r_plugin = require("app.model.repository.plugin_repo")
 
 --------------------------------------------------------------------------
 
@@ -51,6 +47,14 @@ local u_extractor = require("app.utils.extractor")
 ---> 实例信息及配置
 --]]
 local handler = m_base:extend()
+
+--------------------------------------------------------------------------
+
+handler.utils.handle = require("app.utils.handle")
+handler.utils.judge = require("app.utils.judge")
+handler.utils.extractor = require("app.utils.extractor")
+
+--------------------------------------------------------------------------
 
 --[[
 ---> 实例构造器
@@ -65,12 +69,23 @@ function handler:new(conf, store, name, opts)
 
     -- 传导值进入父类
     handler.super.new(self, conf, store, name, opts)
+    
+    -- 重新转向缓存
+    self._cache_using = self._store.cache.using
 
     -- 当前缓存构造器
     self._cache = self._store.plugin
 
     -- 获取基本请求信息抓取对象
     self._request = u_request(self._name)
+    
+    -- 引用
+    self.model = {
+    	current_repo = r_plugin(conf, store, self._source),
+    	ref_repo = {
+            
+    	}
+	}
 end
 
 --------------------------------------------------------------------------
@@ -152,8 +167,8 @@ end
 
 -- 覆写日志函数
 function handler:check_rule_log(rule)
-    rule = (type(rule) == "boolean" and { log = rule }) or rule
-    return rule and self.utils.object.check(rule.log)
+    rule = (type(rule) == "boolean" and { handle = { log = rule } }) or rule
+    return rule and self.utils.object.check(rule.handle.log)
 end
 
 function handler:rule_log_err(rule, text)
@@ -185,15 +200,15 @@ function handler:_filter_rules(sid, pass_func)
     for i, rule in ipairs(rules) do
         if rule.enable == true then
             -- judge阶段
-            local pass, matched = u_judge.judge_rule(rule, self._name)
+            local pass, matched = handler.utils.judge.judge_rule(rule, self._name)
 
             -- extract阶段
-            local variables = u_extractor.extract_variables(rule.extractor)
-
+            local variables = handler.utils.extractor.extract_variables(rule.extractor)
+            
             local is_log = rule.log == true
             -- handle阶段
             if pass then
-                self:rule_log_info(is_log, s_format("[MATCH-RULE] %s, host: %s, uri: %s", rule.name, n_var.host, n_var.request_uri))
+                self:rule_log_info(is_log, s_format("[%s-MATCH-RULE] %s, host: %s, uri: %s", self._name, rule.name, n_var.host, n_var.request_uri))
                 
                 if pass_func then
                     pass_func(rule, variables, matched)
@@ -201,7 +216,7 @@ function handler:_filter_rules(sid, pass_func)
 
                 return true
             else
-                self:rule_log_info(is_log, s_format("[NOT_MATCH-RULE] host: %s, uri: %s", rule.name, n_var.request_uri))
+                self:rule_log_info(is_log, s_format("[%s-NOT_MATCH-RULE] host: %s, uri: %s", self._name, rule.name, n_var.request_uri))
             end
         end
     end
@@ -213,6 +228,48 @@ end
 
 function handler:get_name()
     return self._name
+end
+
+function handler:combine_micro_handle_by_rule(rule, variables)
+    local n_var_uri = n_var.uri
+    local n_var_host = n_var.host
+
+    local handle = rule.handle
+    if rule.type == 1 then
+        if handle.micro then
+            local micro = self.model.current_repo:get_rule("micros", handle.micro)
+            
+            if not micro or not micro.value then
+                self:rule_log_err(rule, self.format("[%s-%s] can not find micro '%s'. host: %s, uri: %s", self._name, rule.name, handle.micro, n_var_host, n_var_uri))
+                return
+            end
+
+            local micro_value = self.utils.json.decode(micro.value)
+            if not micro_value or not micro_value.handle then
+                self:rule_log_err(rule, self.format("[%s-%s] can not parser micro '%s' from value '%s'. host: %s, uri: %s", self._name, rule.name, handle.micro, micro_value, n_var_host, n_var_uri))
+                return
+            end
+
+            handle = micro_value.handle
+        else
+            handle = {}
+        end
+    end
+    
+    local extractor_type = rule.extractor.type
+    local handle_host = handle.host
+    if not handle_host or handle_host == "" then -- host默认取请求的host
+        handle_host = n_var_host
+    else 
+        handle_host = self.utils.handle.build_upstream_host(extractor_type, handle_host, variables, self._name)
+    end
+
+    handle.host = handle_host
+    handle.url = self.utils.handle.build_upstream_url(extractor_type, handle.url, variables, self._name)
+
+    self:rule_log_err(rule, self.format("[%s-%s] extractor_type: %s, host: %s, url: %s", self._name, rule.name, extractor_type, handle.host, handle.url))
+
+    return handle
 end
 
 function handler:exec_action( rule_pass_func, rule_failure_func )
@@ -235,13 +292,13 @@ function handler:exec_action( rule_pass_func, rule_failure_func )
             else
                 selector_pass = judge_util.judge_selector(selector, self._name)-- selector judge
             end
-            
+
             local is_log = selector.handle and selector.handle.log == true
             if selector_pass then
                 self:rule_log_info(is_log, s_format("[PASS-SELECTOR: %s] %s", sid, n_var.uri))
                 local stop = self:_filter_rules(sid, rule_pass_func, rule_failure_func)
                 if stop then -- 不再执行此插件其他逻辑
-                    return
+                    return false
                 end
             else
                 self:rule_log_info(is_log, s_format("[NOT-PASS-SELECTOR: %s] %s", sid, n_var.uri))
