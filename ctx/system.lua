@@ -24,7 +24,7 @@ local r_plugin = require("app.model.repository.plugin_repo")
 -------------------------------------------------- Plugins -------------------------------------------------
 
 
-local loaded_plugins = {}
+local loaded_plugins_handler = {}
 
 -- ms
 local function now()
@@ -45,10 +45,12 @@ local function load_plugins_handler(config, store)
                 n_log(n_err, "The following plugin is not installed: " .. plugin_name)
             else
                 n_log(n_debug, "Loading plugin: " .. plugin_name)
-                t_insert(sorted_plugins, {
+                local new_plugin = {
                     name = plugin_name,
                     handler = plugin_handler(config, store),
-                })
+                }
+                
+                t_insert(sorted_plugins, new_plugin)
             end
         end
     end)
@@ -209,7 +211,7 @@ function _obj.init(options)
         ctx_store["buffer"].using = find_ram_node("buffer")
         ctx_store["plugin"] = find_ram_node("plugin", "cache")
         
-        loaded_plugins = load_plugins_handler(config, ctx_store)
+        loaded_plugins_handler = load_plugins_handler(config, ctx_store)
         ngx.update_time()
         config.app_start_at = ngx.now()
     end)
@@ -250,16 +252,26 @@ function _obj.init_worker()
         end
     end
 
-    u_each.array_action(loaded_plugins, function ( _, plugin )
+    u_each.array_action(loaded_plugins_handler, function ( _, plugin )
         return plugin.handler:init_worker()
     end)
+end
+
+-- 执行阶段检测
+function phase_exec(exec_action)
+    -- 自请求不验证
+    if not ngx.is_subrequest then
+        exec_action()
+    end
 end
 
 function _obj.redirect()
     ngx.ctx.APP_REDIRECT_START = now()
 
-    u_each.array_action(loaded_plugins, function ( _, plugin )
-        return plugin.handler:redirect()
+    u_each.array_action(loaded_plugins_handler, function ( _, plugin )
+        phase_exec(function()
+            plugin.handler:redirect()
+        end)
     end)
 
     local now = now()
@@ -270,8 +282,10 @@ end
 function _obj.rewrite()
     ngx.ctx.APP_REWRITE_START = now()
 
-    u_each.array_action(loaded_plugins, function ( _, plugin )
-        return plugin.handler:rewrite()
+    u_each.array_action(loaded_plugins_handler, function ( _, plugin )
+        phase_exec(function()
+            plugin.handler:rewrite()
+        end)
     end)
 
     local now = now()
@@ -283,8 +297,10 @@ end
 function _obj.access()
     ngx.ctx.APP_ACCESS_START = now()
 
-    u_each.array_action(loaded_plugins, function ( _, plugin )
-        return plugin.handler:access()
+    u_each.array_action(loaded_plugins_handler, function ( _, plugin )
+        phase_exec(function()
+            plugin.handler:access()
+        end)
     end)
 
     local now = now()
@@ -305,8 +321,10 @@ function _obj.header_filter()
         ngx.ctx.APP_HEADER_FILTER_STARTED_AT = now
     end
 
-    u_each.array_action(loaded_plugins, function ( _, plugin )
-        return plugin.handler:header_filter()
+    u_each.array_action(loaded_plugins_handler, function ( _, plugin )
+        phase_exec(function()
+            plugin.handler:header_filter()
+        end)
     end)
 
     if ngx.ctx.ACCESSED then
@@ -317,8 +335,10 @@ function _obj.header_filter()
 end
 
 function _obj.body_filter()
-    u_each.array_action(loaded_plugins, function ( _, plugin )
-        return plugin.handler:body_filter()
+    u_each.array_action(loaded_plugins_handler, function ( _, plugin )
+        phase_exec(function()
+            plugin.handler:body_filter()
+        end)
     end)
 
     local now = now()
@@ -328,8 +348,10 @@ function _obj.body_filter()
 end
 
 function _obj.log()
-    u_each.array_action(loaded_plugins, function ( _, plugin )
-        return plugin.handler:log()
+    u_each.array_action(loaded_plugins_handler, function ( _, plugin )
+        phase_exec(function()
+            plugin.handler:log()
+        end)
     end)
 end
 

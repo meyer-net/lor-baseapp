@@ -51,68 +51,49 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-function handler:redirect()
-    -- self._log.err("load exec redirect")
-    local rule_pass_func = function (rule, variables, rule_matched)
-        local ngx_var = ngx.var
-        local ngx_var_uri = ngx_var.uri
-        local ngx_var_args = ngx_var.args
-        local ngx_var_host = ngx_var.host
-        local ngx_redirect = ngx.redirect
+function handler:_redirect_action(rule, variables, conditions_matched)
+    local ngx_var = ngx.var
+    local ngx_var_uri = ngx_var.uri
+    local ngx_var_args = ngx_var.args
+    local ngx_var_host = ngx_var.host
+    local ngx_redirect = ngx.redirect
 
-        local handle = rule.handle
-        if handle and handle.url_tmpl then
-            local redirect_url = self.utils.handle.build_url(rule.extractor.type, handle.url_tmpl, variables)
-            if redirect_url ~= ngx_var_uri then
-                local redirect_status = tonumber(handle.redirect_status)
-                if redirect_status ~= 301 and redirect_status ~= 302 then
-                    redirect_status = 301
-                end
+    local handle = rule.handle
+    if handle and handle.url_tmpl then
+        local redirect_url = self.utils.handle.build_url(rule.extractor.type, handle.url_tmpl, variables)
+        if redirect_url ~= ngx_var_uri then
+            local redirect_status = tonumber(handle.redirect_status)
+            if redirect_status ~= 301 and redirect_status ~= 302 then
+                redirect_status = 301
+            end
 
-                if s_find(redirect_url, 'http') ~= 1 then
-                    redirect_url = self.format("%s://%s%s", ngx_var_scheme, ngx_var_host, redirect_url)
-                end
+            if s_find(redirect_url, 'http') ~= 1 then
+                redirect_url = self.format("%s://%s%s", ngx_var_scheme, ngx_var_host, redirect_url)
+            end
 
-                if ngx_var_args ~= nil then
-                    if s_find(redirect_url, '?') then -- 不存在?，直接缀上url args
-                        if handle.trim_qs ~= true then
-                            redirect_url = redirect_url .. "&" .. ngx_var_args
-                        end
-                    else
-                        if handle.trim_qs ~= true then
-                            redirect_url = redirect_url .. "?" .. ngx_var_args
-                        end
+            if ngx_var_args ~= nil then
+                if s_find(redirect_url, '?') then -- 不存在?，直接缀上url args
+                    if handle.trim_qs ~= true then
+                        redirect_url = redirect_url .. "&" .. ngx_var_args
+                    end
+                else
+                    if handle.trim_qs ~= true then
+                        redirect_url = redirect_url .. "?" .. ngx_var_args
                     end
                 end
-
-                self:rule_log_err(rule, self.format("[%s] match uri '%s' redirect to: '%s'", self._name, ngx_var_uri, redirect_url))
-
-                ngx_redirect(redirect_url, redirect_status)
             end
+
+            self:rule_log_err(rule, self.format("[%s] match uri '%s' redirect to: '%s'", self._name, ngx_var_uri, redirect_url))
+
+            ngx_redirect(redirect_url, redirect_status)
         end
     end
-
-    return self:exec_action(rule_pass_func)
 end
 
-function handler:rewrite()
-    -- self._log.err("load exec rewrite")
-end
+-----------------------------------------------------------------------------------------------------------------
 
-function handler:access()
-    -- self._log.err("load exec access")
-end
-
-function handler:header_filter()
-    -- self._log.err("load exec header_filter")
-end
-
-function handler:body_filter()
-    -- self._log.err("load exec header_filter")
-end
-
-function handler:log()
-    -- self._log.err("load exec log")
+function handler:redirect()
+    self:exec_action(self._redirect_action)
 end
 
 -----------------------------------------------------------------------------------------------------------------

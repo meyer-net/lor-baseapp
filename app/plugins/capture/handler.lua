@@ -53,66 +53,47 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-function handler:redirect()
-    -- self._log.err("load exec redirect")
-end
+function handler:_rewrite_action(rule, variables, conditions_matched)
+    local ngx_var = ngx.var
+    local ngx_var_host = ngx_var.host
+    local ngx_var_uri = ngx_var.uri
 
-function handler:rewrite()
-    -- self._log.err("load exec rewrite")
-    local rule_pass_func = function (rule, variables, rule_matched)     
-        local ngx_var = ngx.var
-        local ngx_var_host = ngx_var.host
-        local ngx_var_uri = ngx_var.uri
-
-        local n_req = ngx.req
-        local micro_handle = self:combine_micro_handle_by_rule(rule)
-        local capture_uri = self.format("/capture_proxy/%s", s_gsub(s_gsub(micro_handle.url, "://","/"), ":", "/"))
-        local method = n_req.get_method()
-        if (method ~= "GET") then
-            n_req.read_body()
-        end
-
-        local capture_method = ngx[self.format("HTTP_%s", method)]
-        local res, err = ngx.location.capture(capture_uri, {
-            method = capture_method,
-            copy_all_vars = true,
-            vars = { 
-                capture_host = micro_handle.host,
-                capture_payload = ngx.ctx.payload
-            }
-        })
-        
-        if res.status == ngx.HTTP_OK then
-            self:rule_log_info(rule, self.format("[%s-%s] Get response from '%s', status: %s. host: %s, uri: %s", self._name, rule.name, micro_handle.url, res.status, ngx_var_host, ngx_var_uri))
-        else
-            self:rule_log_err(rule, self.format("[%s-%s] Get response from '%s' error, status: %s, error: %s. host: %s, uri: %s", self._name, rule.name, micro_handle.url, res.status, err, ngx_var_host, ngx_var_uri))
-        end
-
-        if rule.handle.content_type then
-            ngx.header['Content-Type'] = rule.handle.content_type
-        end
-        
-        ngx.status = res.status
-        ngx.say(res.body)
+    local n_req = ngx.req
+    local micro_handle = self:combine_micro_handle_by_rule(rule)
+    local capture_uri = self.format("/capture_proxy/%s", s_gsub(s_gsub(micro_handle.url, "://","/"), ":", "/"))
+    local method = n_req.get_method()
+    if (method ~= "GET") then
+        n_req.read_body()
     end
 
-    return self:exec_action(rule_pass_func)
+    local capture_method = ngx[self.format("HTTP_%s", method)]
+    local res, err = ngx.location.capture(capture_uri, {
+        method = capture_method,
+        copy_all_vars = true,
+        vars = { 
+            capture_host = micro_handle.host,
+            capture_payload = ngx.ctx.payload
+        }
+    })
+    
+    if res.status == ngx.HTTP_OK then
+        self:rule_log_info(rule, self.format("[%s-%s] Get response from '%s', status: %s. host: %s, uri: %s", self._name, rule.name, micro_handle.url, res.status, ngx_var_host, ngx_var_uri))
+    else
+        self:rule_log_err(rule, self.format("[%s-%s] Get response from '%s' error, status: %s, error: %s. host: %s, uri: %s", self._name, rule.name, micro_handle.url, res.status, err, ngx_var_host, ngx_var_uri))
+    end
+
+    if rule.handle.content_type then
+        ngx.header['Content-Type'] = rule.handle.content_type
+    end
+    
+    ngx.status = res.status
+    ngx.say(res.body)
 end
 
-function handler:access()
-    -- self._log.err("load exec access")
-end
+-----------------------------------------------------------------------------------------------------------------
 
-function handler:header_filter()
-    -- self._log.err("load exec header_filter")
-end
-
-function handler:body_filter()
-    -- self._log.err("load exec header_filter")
-end
-
-function handler:log()
-    -- self._log.err("load exec log")
+function handler:rewrite()
+    self:exec_action(self._rewrite_action)
 end
 
 -----------------------------------------------------------------------------------------------------------------

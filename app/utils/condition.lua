@@ -86,8 +86,8 @@ local function assert_condition(real, operator, expected)
         return false, real
     end
 
-    local result, match = action()
-    return result, match or real
+    local success, matched = action()
+    return success, matched or real
 end
 
 ---> 上下文 操作区域 --------------------------------------------------------------------------------------------
@@ -152,7 +152,7 @@ function _M.judge(condition)
             real = post_params[condition.name]
         end,
         ["Referer"] = function()
-            real =  ngx.var.http_referer or ngx.var.host
+            real =  ngx.var.http_referer or s_format("%s://%s", ngx.var.scheme, ngx.var.host)
         end,
         ["Host"] = function()
             real =  ngx.var.host
@@ -163,8 +163,15 @@ function _M.judge(condition)
     if action then 
         action()
     end
-
-    return assert_condition(real, operator, expected)
+    
+    local success, matched = assert_condition(real, operator, expected)
+    return success, {
+        type = condition_type,
+        operator = operator,
+        real = real,
+        expected = expected,
+        matched = matched
+    }
 end
 
 --[[

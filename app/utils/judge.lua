@@ -59,29 +59,30 @@ end
 function _M.filter_and_conditions(conditions)
     if not conditions then return false end
     
-    local pass, match = false
+    local matched_list = {}
     for i, c in ipairs(conditions) do
-        pass, match = u_condition.judge(c)
+        local pass, matched = u_condition.judge(c)
         if not pass then
-            return false
+            return false, {}
         end
+
+        t_insert(matched_list, matched)
     end
 
-    return pass, match
+    return #conditions == #matched_list, matched_list
 end
 
 function _M.filter_or_conditions(conditions)
     if not conditions then return false end
 
-    local pass, match = false
     for i, c in ipairs(conditions) do
-        pass, match = u_condition.judge(c)
+        local pass, matched = u_condition.judge(c)
         if pass then
-            return true
+            return true, matched
         end
     end
 
-    return pass, match
+    return false, {}
 end
 
 function _M.filter_complicated_conditions(expression, conditions, plugin_name)

@@ -12,6 +12,7 @@
 local require = require
 
 local s_sub = string.sub
+local s_gsub = string.gsub
 
 --------------------------------------------------------------------------
 
@@ -40,7 +41,7 @@ function handler:new(conf, store)
     self.PRIORITY = 9997
 
     -- 插件名称
-    self._source = "rewrite"
+    self._source = "alias"
 
 	-- 传导至父类填充基类操作对象
 	handler.super.new(self, conf, store)
@@ -49,33 +50,46 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-function handler:rewrite_action(rule, variables, conditions_matched)
+function handler:_rewrite_action(rule, variables, conditions_matched)
     local ngx_var = ngx.var
+    local ngx_var_host = ngx_var.host
     local ngx_var_uri = ngx_var.uri
-    local ngx_set_uri = ngx.req.set_uri
-    local ngx_set_uri_args = ngx.req.set_uri_args
-    local ngx_decode_args = ngx.decode_args
-    local ngx_re_find = ngx.re.find
 
     local handle = rule.handle
-    if handle and handle.uri_tmpl then
-        local rewrite_uri = self.utils.handle.build_uri(rule.extractor.type, handle.uri_tmpl, variables)
-        if rewrite_uri and rewrite_uri ~= ngx_var_uri then
-            self:rule_log_err(rule, self.format("[%s] match uri '%s' rewrite to: '%s'", self._name, ngx_var_uri, rewrite_uri))
+    if handle and handle.alias then
+        local alias_uri = ngx_var.request_uri
+        self.utils.each.array_action(conditions_matched, function ( _, condition )
+            if condition.type == "URI" then
+                local local_uri = s_gsub(alias_uri, condition.matched, "")
 
-            local from, to, err = ngx_re_find(rewrite_uri, "[%?]{1}", "jo")
-            if not err and from and from >= 1 then
-                local query_string = s_sub(rewrite_uri, from + 1)
-                if query_string then
-                    local args = ngx_decode_args(query_string, 0)
-                    if args then 
-                        ngx_set_uri_args(args) 
-                    end
-                end
+                -- 调整请求路径
+                alias_uri = self.format("/alias/%s", local_uri)
             end
+        end)
 
-            ngx_set_uri(rewrite_uri, true)
+        local n_req = ngx.req
+        local method = n_req.get_method()
+        if (method ~= "GET") then
+            n_req.read_body()
         end
+
+        local capture_method = ngx[self.format("HTTP_%s", method)]
+        local res, err = ngx.location.capture(alias_uri, {
+            method = capture_method,
+            copy_all_vars = true,
+            vars = { 
+                alias = handle.alias
+            }
+        })
+    
+        if res.status == ngx.HTTP_OK then
+            self:rule_log_info(rule, self.format("[%s-%s] Alias to: '%s' success, status: %s. host: %s, uri: %s", self._name, rule.name, handle.alias, res.status, ngx_var_host, ngx_var_uri))
+        else
+            self:rule_log_err(rule, self.format("[%s-%s] Alias to: '%s' error, status: %s, error: %s. host: %s, uri: %s", self._name, rule.name, handle.alias, res.status, err, ngx_var_host, ngx_var_uri))
+        end
+        
+        ngx.status = res.status
+        ngx.say(res.body)
     end
 end
 

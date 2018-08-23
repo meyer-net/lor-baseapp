@@ -46,45 +46,25 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-function handler:redirect()
-    -- self._log.err("load exec redirect")
+function handler:_rewrite_action(rule, variables, conditions_matched)
+    local ngx_var = ngx.var
+    local ngx_var_uri = ngx_var.uri
+    local ngx_var_host = ngx_var.host
+
+    local micro_handle = self:combine_micro_handle_by_rule(rule, variables) 
+    local upstream_url = micro_handle.url
+    if upstream_url then
+        ngx_var.upstream_host = micro_handle.host
+        ngx_var.upstream_url = micro_handle.url
+    else
+        self:rule_log_err(rule, self.format("[%s-%s] no upstream host or url. host: %s, uri: %s", self._name, rule.name, ngx_var_host, ngx_var_uri))
+    end
 end
+
+-----------------------------------------------------------------------------------------------------------------
 
 function handler:rewrite()
-    -- self._log.err("load exec rewrite")
-    
-    local rule_pass_func = function (rule, variables, rule_matched)
-        local ngx_var = ngx.var
-        local ngx_var_uri = ngx_var.uri
-        local ngx_var_host = ngx_var.host
-
-        local micro_handle = self:combine_micro_handle_by_rule(rule, variables) 
-        local upstream_url = micro_handle.url
-        if upstream_url then
-            ngx_var.upstream_host = micro_handle.host
-            ngx_var.upstream_url = micro_handle.url
-        else
-            self:rule_log_err(rule, self.format("[%s-%s] no upstream host or url. host: %s, uri: %s", self._name, rule.name, ngx_var_host, ngx_var_uri))
-        end
-    end
-
-    return self:exec_action(rule_pass_func)
-end
-
-function handler:access()
-    -- self._log.err("load exec access")
-end
-
-function handler:header_filter()
-    -- self._log.err("load exec header_filter")
-end
-
-function handler:body_filter()
-    -- self._log.err("load exec header_filter")
-end
-
-function handler:log()
-    -- self._log.err("load exec log")
+    self:exec_action(self._rewrite_action)
 end
 
 -----------------------------------------------------------------------------------------------------------------

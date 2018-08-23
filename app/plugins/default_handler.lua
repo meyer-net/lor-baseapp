@@ -54,7 +54,7 @@ end
 
 function handler:access()
     -- self._log.err("load exec access")
-    local rule_pass_func = function (rule, variables, rule_matched)     
+    local rule_pass_func = function (rule, variables, conditions_matched)     
         local ngx_var = ngx.var
         local ngx_var_host = ngx_var.host
         local ngx_var_uri = ngx_var.uri

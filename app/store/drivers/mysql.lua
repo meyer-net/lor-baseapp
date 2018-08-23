@@ -65,7 +65,7 @@ local open = function(conf)
         if conf.debug then
             n_log(n_debug, s_format("[%s.open.query]SQL：%s", namespace, query_str))
         end
-
+        
         local is_trans, db = connect()
         db:set_timeout(conf.timeout) -- 1 sec
         

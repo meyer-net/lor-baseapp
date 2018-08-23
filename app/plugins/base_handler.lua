@@ -191,37 +191,36 @@ end
 
 --------------------------------------------------------------------------
 
-function handler:_filter_rules(sid, pass_func)
-    local rules = self._cache:get_json(self._name .. ".selector." .. sid .. ".rules")
-    if not rules or type(rules) ~= "table" or #rules <= 0 then
-        return false
-    end
+function handler:_rule_action(rule, pass_func, rule_failure_func)
+    local pass, conditions_matched = false, {}
+    if rule.enable then
+        -- judge阶段
+        pass, conditions_matched = self.utils.judge.judge_rule(rule, self._name)
 
-    for i, rule in ipairs(rules) do
-        if rule.enable == true then
-            -- judge阶段
-            local pass, matched = handler.utils.judge.judge_rule(rule, self._name)
-
-            -- extract阶段
-            local variables = handler.utils.extractor.extract_variables(rule.extractor)
+        -- extract阶段
+        local variables = self.utils.extractor.extract_variables(rule.extractor)
+        
+        local is_log = rule.log == true
+        -- handle阶段
+        if pass then
+            self:rule_log_info(is_log, s_format("*****[%s-MATCH-RULE] %s*****: conditions_matched: %s, host: %s, uri: %s", self._name, rule.name, self.utils.json.encode(matched), n_var.host, n_var.request_uri))
             
-            local is_log = rule.log == true
-            -- handle阶段
-            if pass then
-                self:rule_log_info(is_log, s_format("[%s-MATCH-RULE] %s, host: %s, uri: %s", self._name, rule.name, n_var.host, n_var.request_uri))
-                
-                if pass_func then
-                    pass_func(rule, variables, matched)
-                end
-
-                return true
+            if pass_func then
+                pass_func(self, rule, variables, conditions_matched)
             else
-                self:rule_log_info(is_log, s_format("[%s-NOT_MATCH-RULE] host: %s, uri: %s", self._name, rule.name, n_var.request_uri))
+                self:rule_log_err(is_log, s_format("*****[%s-MATCH-RULE] %s*****: not contains [action], host: %s, uri: %s", self._name, rule.name, n_var.host, n_var.request_uri))
             end
+        else
+            self:rule_log_info(is_log, s_format("*****[%s-NOT_MATCH-RULE]*****: host: %s, uri: %s", self._name, rule.name, n_var.request_uri))
         end
     end
 
-    return false
+    return pass, conditions_matched
+end
+
+-- 提供重写用于实现规则的监测
+function handler:_stop_check(rule, rule_passed)
+    return rule_passed or not rule.handle.continue
 end
 
 --------------------------------------------------------------------------
@@ -267,12 +266,16 @@ function handler:combine_micro_handle_by_rule(rule, variables)
     handle.host = handle_host
     handle.url = self.utils.handle.build_upstream_url(extractor_type, handle.url, variables, self._name)
 
-    self:rule_log_err(rule, self.format("[%s-%s] extractor_type: %s, host: %s, url: %s", self._name, rule.name, extractor_type, handle.host, handle.url))
+    self:rule_log_info(rule, self.format("[%s-%s] extractor_type: %s, host: %s, url: %s", self._name, rule.name, extractor_type, handle.host, handle.url))
 
     return handle
 end
 
 function handler:exec_action( rule_pass_func, rule_failure_func )
+    if not rule_pass_func then
+        return
+    end
+
     local enable = self._cache:get(s_format("%s.enable", self._name))
     local meta = self._cache:get_json(s_format("%s.meta", self._name))
     local selectors = self._cache:get_json(s_format("%s.selectors", self._name))
@@ -281,34 +284,50 @@ function handler:exec_action( rule_pass_func, rule_failure_func )
     if not self.utils.object.check(enable) or not meta or not ordered_selectors or not selectors then
         return
     end
-
+    
     for i, sid in ipairs(ordered_selectors) do
-        self:rule_log_debug(true, s_format("[PASS THROUGH SELECTOR: %s]", sid))
+        self:rule_log_debug(is_log, s_format("[PASS THROUGH SELECTOR: %s]", sid))
         local selector = selectors[sid]
+        
         if selector and selector.enable == true then
             local selector_pass 
             if selector.type == 0 then -- 全流量选择器
                 selector_pass = true
             else
-                selector_pass = judge_util.judge_selector(selector, self._name)-- selector judge
+                selector_pass = self.utils.judge.judge_selector(selector, self._name)-- selector judge
             end
 
             local is_log = selector.handle and selector.handle.log == true
             if selector_pass then
                 self:rule_log_info(is_log, s_format("[PASS-SELECTOR: %s] %s", sid, n_var.uri))
-                local stop = self:_filter_rules(sid, rule_pass_func, rule_failure_func)
-                if stop then -- 不再执行此插件其他逻辑
-                    return false
+                
+                local rules = self._cache:get_json(self._name .. ".selector." .. sid .. ".rules")                
+                if rules and type(rules) == "table" and #rules > 0 then
+                    local stop = false
+
+                    self.utils.each.array_action(rules, function ( _, rule )
+                        -- 指示规则验证通过
+                        local rule_passed, conditions_matched = self:_rule_action(rule, rule_pass_func, rule_failure_func)
+
+                        stop = self:_stop_check(rule, rule_passed, rule_failure_func) 
+                        
+                        -- 匹配到插件 或 略过后续规则时跳出
+                        return not stop -- 循环跳出，each接受false时才会跳出
+                    end)
+    
+                    if stop then -- 不再执行此插件其他逻辑
+                        return false
+                    end
                 end
             else
-                self:rule_log_info(is_log, s_format("[NOT-PASS-SELECTOR: %s] %s", sid, n_var.uri))
+                self:rule_log_debug(is_log, s_format("[NOT-PASS-SELECTOR: %s] %s", sid, n_var.uri))
             end
 
             -- if continue or break the loop
             if selector.handle and selector.handle.continue == true then
                 -- continue next selector
             else
-                break
+                break -- 跳过当前插件的后续选择器
             end
         end
     end
@@ -317,28 +336,26 @@ end
 --------------------------------------------------------------------------
 
 function handler:init_worker()
-    self._slog.debug(" executing plugin \"", self._name, "\": init_worker")
+    self._slog.debug("executing plugin %s: init_worker", self._name)
 end
 
 function handler:redirect()
-    self._log.debug(" executing plugin \"", self._name, "\": redirect")
+    self._log.debug("executing plugin %s: redirect", self._name)
 end
 
 function handler:rewrite()
-    self._log.debug(" executing plugin \"", self._name, "\": rewrite")
+    self._log.debug("executing plugin %s: rewrite", self._name)
 end
 
 function handler:access()
-    self._log.debug(" executing plugin \"", self._name, "\": access")
+    self._log.debug("executing plugin %s: access", self._name)
 end
 
 function handler:header_filter()
-    self._log.debug(" executing plugin \"", self._name, "\": header_filter")
+    self._log.debug("executing plugin %s: header_filter", self._name)
 end
 
 function handler:body_filter()
-    self._log.debug(" executing plugin \"", self._name, "\": body_filter")
-    
     --[[
         Nginx 的 upstream 相关模块，以及 OpenResty 的 content_by_lua，会单独发送一个设置了 last_buf 的空 buffer来表示流的结束。
         这算是一个约定俗成的惯例，所以有必要在运行相关逻辑之前，检查 ngx.arg[1] 是否为空。
@@ -349,10 +366,12 @@ function handler:body_filter()
     if not is_normal_request then
         return
     end
+
+    self._log.debug("executing plugin %s: body_filter", self._name)
 end
 
 function handler:log()
-    self._log.debug(" executing plugin \"", self._name, "\": log")
+    self._log.debug("executing plugin %s: log", self._name)
 end
 
 --------------------------------------------------------------------------
