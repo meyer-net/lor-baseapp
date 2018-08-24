@@ -18,6 +18,7 @@ local u_loader = require("app.utils.loader")
 local u_each = require("app.utils.each")
 local u_table = require("app.utils.table")
 local u_string = require("app.utils.string")
+local u_object = require("app.utils.object")
 
 local r_plugin = require("app.model.repository.plugin_repo")
 
@@ -335,6 +336,11 @@ function _obj.header_filter()
 end
 
 function _obj.body_filter()
+    -- local is_normal_request = u_object.check(ngx.arg[1]) and not ngx.is_subrequest
+    -- if not is_normal_request then
+    --     return
+    -- end
+
     u_each.array_action(loaded_plugins_handler, function ( _, plugin )
         phase_exec(function()
             plugin.handler:body_filter()

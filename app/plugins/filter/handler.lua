@@ -40,7 +40,7 @@ local handler = p_base:extend()
 --]]
 function handler:new(conf, store)
     -- 优先级调控
-    self.PRIORITY = 0
+    self.PRIORITY = 1
 
     -- 插件名称
     self._source = "filter"

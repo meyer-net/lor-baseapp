@@ -72,7 +72,7 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
         if (method ~= "GET") then
             n_req.read_body()
         end
-
+        
         local capture_method = ngx[self.format("HTTP_%s", method)]
         local res, err = ngx.location.capture(alias_uri, {
             method = capture_method,

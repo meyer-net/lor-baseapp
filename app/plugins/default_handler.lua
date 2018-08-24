@@ -44,37 +44,14 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-function handler:redirect()
-    -- self._log.err("load exec redirect")
+function handler:_log_action(rule, variables, conditions_matched)
 end
 
-function handler:rewrite()
-    -- self._log.err("load exec rewrite")
-end
-
-function handler:access()
-    -- self._log.err("load exec access")
-    local rule_pass_func = function (rule, variables, conditions_matched)     
-        local ngx_var = ngx.var
-        local ngx_var_host = ngx_var.host
-        local ngx_var_uri = ngx_var.uri
-
-        self:rule_log_err(rule, self.format("[%s-%s] notset_message. host: %s, uri: %s", self._name, rule.name, ngx_var_host, ngx_var_uri))
-    end
-
-    return self:exec_action(rule_pass_func)
-end
-
-function handler:header_filter()
-    -- self._log.err("load exec header_filter")
-end
-
-function handler:body_filter()
-    -- self._log.err("load exec header_filter")
-end
+-----------------------------------------------------------------------------------------------------------------
 
 function handler:log()
     -- self._log.err("load exec log")
+    self:exec_action(self._log_action)
 end
 
 -----------------------------------------------------------------------------------------------------------------

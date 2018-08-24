@@ -335,6 +335,29 @@ end
 
 --------------------------------------------------------------------------
 
+function handler:exec_filter(filter_action)
+    if not filter_action or not u_request:check_context_content_type_can_be_filter() then
+        return
+    end
+
+    local chunk, eof = ngx.arg[1] or "", ngx.arg[2]  -- 获取当前的流 和是否时结束
+    local info = ngx.ctx.tmp_body
+    
+    if info then
+        ngx.ctx.tmp_body = info .. chunk -- 这个可以将原本的内容记录下来
+    else
+        ngx.ctx.tmp_body = chunk
+    end
+    
+    if eof then
+        filter_action(ngx.ctx.tmp_body)
+    else
+        ngx.arg[1] = nil -- 这里是为了将原本的输出不显示
+    end
+end
+
+--------------------------------------------------------------------------
+
 function handler:init_worker()
     self._slog.debug("executing plugin %s: init_worker", self._name)
 end

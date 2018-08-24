@@ -374,6 +374,7 @@ end
 --]]
 function _obj:get_content_type_by_ext(ext)
     local ext_ct_dict = {
+        [""] = "text/html", 
         [".html"] = "text/html", 
         [".htm"] = "text/html", 
         [".shtml"] = "text/html", 
@@ -578,6 +579,80 @@ function _obj:get_static_content_type()
     end)
 
     return match_type
+end
+
+--[[
+---> 获取静态的CONTENT-TYPE类型
+--]]
+function _obj:check_context_content_type_is_text()
+    local content_type_value = n_req.get_headers(0)[CONTENT_TYPE] or self:get_content_type_by_ext(self:get_ext_by_uri())
+    if not u_object.check(content_type_value) then
+        return true
+    end
+    
+    local lower_content_type = content_type_value:lower()
+    local static_mime_types = {
+        "text/html", 
+        "text/css", 
+        "text/xml", 
+        "application/javascript", 
+        "application/atom+xml", 
+        "application/rss+xml", 
+        "text/mathml", 
+        "text/plain", 
+        "text/vnd.sun.j2me.app-descriptor", 
+        "text/vnd.wap.wml", 
+        "text/x-component"
+    }
+
+    local matched = false
+    u_each.array_action(static_mime_types, function ( i, ct )
+        match_type = match_return(lower_content_type, ct, ct)
+        matched = u_object.check(match_type)
+        if matched then
+            return false
+        end
+    end)
+
+    return matched
+end
+
+--[[
+---> 获取静态的CONTENT-TYPE类型
+--]]
+function _obj:check_context_content_type_can_be_filter()
+    local content_type_value = n_req.get_headers(0)[CONTENT_TYPE] or self:get_content_type_by_ext(self:get_ext_by_uri())
+    if not u_object.check(content_type_value) then
+        return true
+    end
+    
+    local lower_content_type = content_type_value:lower()
+    local static_mime_types = {
+        "text/html", 
+        "text/xml", 
+        -- "application/javascript", 
+        "application/atom+xml", 
+        "application/rss+xml", 
+        "text/mathml", 
+        "text/plain", 
+        "text/vnd.sun.j2me.app-descriptor", 
+        "text/vnd.wap.wml", 
+        "text/x-component"
+    }
+
+    local matched = false
+    u_each.array_action(static_mime_types, function ( i, ct )
+        match_type = match_return(lower_content_type, ct, ct)
+        if match_type == "text/css" then
+            ngx.log(ngx.ERR, "3333333333333333333333333333333")
+        end
+        matched = u_object.check(match_type)
+        if matched then
+            return false
+        end
+    end)
+
+    return matched
 end
 
 --[[
