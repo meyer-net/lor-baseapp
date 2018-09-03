@@ -1,5 +1,6 @@
 -- 自定义函数指针
 local type = type
+local s_lower = string.lower
 
 -- 统一引用导入LIBS
 local r_lock = require("resty.lock")
@@ -199,6 +200,19 @@ end
 
 function _obj:get(key)
     return self._cache:get(key)
+end
+
+function _obj:get_bool(key)
+    local value, f = self:get(key)
+    if value == nil or value == "" then
+        return false, f
+    end
+
+    if type(value) == "boolean" then
+        return value, f
+    end
+
+    return s_lower(value) == "true", f
 end
 
 function _obj:get_json(key)

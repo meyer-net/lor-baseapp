@@ -11,9 +11,6 @@
 --------------------------------------------------------------------------
 local require = require
 
-local s_gsub = string.gsub
-local t_insert = table.insert
-
 --------------------------------------------------------------------------
 
 --[[
@@ -22,9 +19,9 @@ local t_insert = table.insert
 --------------------------------------------------------------------------
 -----> 基础库引用
 local r_template = require("resty.template")
-local p_base = require("app.plugins.handler_adapter")
 
-local u_request = require("app.utils.request")
+-----> 业务引用
+local p_base = require("app.plugins.handler_adapter")
 
 --------------------------------------------------------------------------
 
@@ -32,10 +29,6 @@ local u_request = require("app.utils.request")
 ---> 当前对象
 --]]
 local handler = p_base:extend()
-
---------------------------------------------------------------------------
-
-handler.utils.args = require("app.utils.args")
 
 -----------------------------------------------------------------------------------------------------------------
 

@@ -413,7 +413,7 @@ return function(conf, store, plugin)
                 res:json({
                     success = true,
                     data = {
-                        enable = current_cache:get(plugin .. ".enable"),
+                        enable = current_cache:get_bool(plugin .. ".enable"),
                         meta = current_cache:get_json(plugin .. ".meta"),
                         selectors = current_cache:get_json(plugin .. ".selectors")
                     }

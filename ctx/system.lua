@@ -271,6 +271,7 @@ function _obj.redirect()
 
     u_each.array_action(loaded_plugins_handler, function ( _, plugin )
         phase_exec(function()
+            plugin.handler:_init_cache_to_ctx()
             plugin.handler:redirect()
         end)
     end)

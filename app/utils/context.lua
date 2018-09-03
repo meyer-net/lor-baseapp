@@ -25,6 +25,25 @@ function _M.days_after_registry(req)
     return diff_days, diff
 end
 
+---> 上下文获取
+function _M.context_get(name, val_from)
+    assert(name, "context name cannot be null")
+
+    local ctx_val = ngx.ctx[name]
+    if ctx_val then
+        return ctx_val
+    end
+
+    assert(val_from, "val_from cannot be null")
+    if type(val_from) == "function" then
+        val_from = val_from()
+    end
+
+    ngx.ctx[name] = val_from
+
+    return val_from
+end
+
 --[[
 ---> 
 --]]

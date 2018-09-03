@@ -31,6 +31,7 @@ local r_http = require("resty.http")
 -----> 工具引用
 local m_base = require("app.model.base_model")
 local u_request = require("app.utils.request")
+local u_context = require("app.utils.context")
 
 -----> 外部引用
 --
@@ -276,9 +277,10 @@ function handler:exec_action( rule_pass_func, rule_failure_func )
         return
     end
 
-    local enable = self._cache:get(s_format("%s.enable", self._name))
-    local meta = self._cache:get_json(s_format("%s.meta", self._name))
-    local selectors = self._cache:get_json(s_format("%s.selectors", self._name))
+    local enable = ngx.ctx[s_format("_plugin_%s.enable", self._name)]
+    local meta = ngx.ctx[s_format("_plugin_%s.meta", self._name)]
+    local selectors = ngx.ctx[s_format("_plugin_%s.selectors", self._name)]
+
     local ordered_selectors = meta and meta.selectors
 
     if not self.utils.object.check(enable) or not meta or not ordered_selectors or not selectors then
@@ -301,7 +303,8 @@ function handler:exec_action( rule_pass_func, rule_failure_func )
             if selector_pass then
                 self:rule_log_info(is_log, s_format("[PASS-SELECTOR: %s] %s", sid, n_var.uri))
                 
-                local rules = self._cache:get_json(self._name .. ".selector." .. sid .. ".rules")                
+                local rules = ngx.ctx[s_format("_plugin_%s.selector.%s.rules", self._name, sid)]
+                          
                 if rules and type(rules) == "table" and #rules > 0 then
                     local stop = false
 
@@ -357,6 +360,38 @@ function handler:exec_filter(filter_action)
 end
 
 --------------------------------------------------------------------------
+
+-- 该函数解决在执行阶段上下文不适配REDIS缓存的问题
+function handler:_init_cache_to_ctx()
+    local enable_cache_name = s_format("%s.enable", self._name)
+    local enable = self._cache:get_bool(enable_cache_name)
+    ngx.ctx["_plugin_"..enable_cache_name] = enable
+
+    local meta_cache_name = s_format("%s.meta", self._name)
+    local meta = self._cache:get_json(meta_cache_name)
+    ngx.ctx["_plugin_"..meta_cache_name] = meta
+
+    local selectors_cache_name = s_format("%s.selectors", self._name)
+    local selectors = self._cache:get_json(selectors_cache_name)
+    ngx.ctx["_plugin_"..selectors_cache_name] = selectors
+
+    local ordered_selectors = meta and meta.selectors
+
+    if not self.utils.object.check(enable) or not meta or not ordered_selectors or not selectors then
+        return
+    end
+    
+    for i, sid in ipairs(ordered_selectors) do
+        self:rule_log_debug(is_log, s_format("[PASS THROUGH SELECTOR: %s]", sid))
+        local selector = selectors[sid]
+        
+        if selector and selector.enable == true then
+            local rules_cache_name = s_format("%s.selector.%s.rules", self._name, sid)
+            local rules = self._cache:get_json(rules_cache_name) 
+            ngx.ctx["_plugin_"..rules_cache_name] = rules
+        end
+    end                
+end
 
 function handler:init_worker()
     self._slog.debug("executing plugin %s: init_worker", self._name)
