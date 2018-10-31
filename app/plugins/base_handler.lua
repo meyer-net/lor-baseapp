@@ -201,10 +201,10 @@ function handler:_rule_action(rule, pass_func, rule_failure_func)
         -- extract阶段
         local variables = self.utils.extractor.extract_variables(rule.extractor)
         
-        local is_log = rule.log == true
+        local is_log = rule.handle.log == true
         -- handle阶段
         if pass then
-            self:rule_log_info(is_log, s_format("*****[%s-MATCH-RULE] %s*****: conditions_matched: %s, host: %s, uri: %s", self._name, rule.name, self.utils.json.encode(matched), n_var.host, n_var.request_uri))
+            self:rule_log_info(is_log, s_format("*****[%s-MATCH-RULE] %s*****: conditions_matched: %s, host: %s, uri: %s", self._name, rule.name, self.utils.json.encode(conditions_matched), n_var.host, n_var.request_uri))
             
             if pass_func then
                 pass_func(self, rule, variables, conditions_matched)

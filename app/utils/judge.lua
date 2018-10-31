@@ -90,7 +90,8 @@ function _M.filter_complicated_conditions(expression, conditions, plugin_name)
 
     local params = {}
     for i, c in ipairs(conditions) do
-        t_insert(params, u_condition.judge(c))
+        local success = u_condition.judge(c)
+        t_insert(params, success)
     end
 
     local ok, u_condition = _M.parse_conditions(expression, params)
@@ -118,7 +119,7 @@ function _M.judge_selector(selector, plugin_name)
     local judge_type = selector_judge.type
     local conditions = selector_judge.conditions
     
-    local selector_pass = false
+    local selector_pass, match = false
     if judge_type == 0 or judge_type == 1 then
         selector_pass, match = _M.filter_and_conditions(conditions)
     elseif judge_type == 2 then
@@ -127,7 +128,7 @@ function _M.judge_selector(selector, plugin_name)
         selector_pass, match = _M.filter_complicated_conditions(selector_judge.expression, conditions, plugin_name)
     end
 
-    return selector_pass
+    return selector_pass, match
 end
 
 function _M.judge_rule(rule, plugin_name)

@@ -370,6 +370,13 @@ function _obj:get_ext_by_uri(uri)
 end
 
 --[[
+---> 检测请求uri是否包含扩展名
+--]]
+function _obj:check_ext(uri)
+    return uri:match(".+()%.%w+$")
+end
+
+--[[
 ---> 依据扩展名获取CONTENT-TYPE类型
 --]]
 function _obj:get_content_type_by_ext(ext)
@@ -475,6 +482,8 @@ function _obj:get_content_type_by_ext(ext)
         [".asf"] = "video/x-ms-asf", 
         [".wmv"] = "video/x-ms-wmv", 
         [".avi"] = "video/x-msvideo", 
+        [".apk"] = "application/vnd.android.package-archive",
+        [".ipa"] = "application/vnd.android.package-archive",
         [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
         [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
         [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation"

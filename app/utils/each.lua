@@ -41,14 +41,25 @@ end
 --[[
 ---> 用于普通类型，类似集合、数组遍历
 --]]
-function _M.array_action(array, action, bk_index)
+function _M.array_action(array, action, bk_obj)
     if not u_object.check(array) then
         return false
     end
 
+    local bk_index = 0
+    if type(bk_obj) == "function" then
+        local array_len = #array
+        if array_len <= 0 then
+            bk_obj()
+            return false
+        end
+    else
+        bk_index = bk_obj
+    end
+
     local result = true
     for i, v in ipairs(array) do
-        local res = action(i,v)
+        local res = action(i, v)
 
         if res == false or (bk_index and i >= bk_index) then
             result = false

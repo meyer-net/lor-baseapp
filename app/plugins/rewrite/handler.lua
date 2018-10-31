@@ -49,7 +49,7 @@ end
 
 -----------------------------------------------------------------------------------------------------------------
 
-function handler:rewrite_action(rule, variables, conditions_matched)
+function handler:_rewrite_action(rule, variables, conditions_matched)
     local ngx_var = ngx.var
     local ngx_var_uri = ngx_var.uri
     local ngx_set_uri = ngx.req.set_uri

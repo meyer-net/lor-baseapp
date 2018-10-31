@@ -87,7 +87,7 @@ local function assert_condition(real, operator, expected)
     end
 
     local success, matched = action()
-    return success, matched or real
+    return success or false, matched or real
 end
 
 ---> 上下文 操作区域 --------------------------------------------------------------------------------------------
@@ -153,6 +153,9 @@ function _M.judge(condition)
         end,
         ["Referer"] = function()
             real =  ngx.var.http_referer or s_format("%s://%s", ngx.var.scheme, ngx.var.host)
+        end,
+        ["Domain"] = function()
+            real =  s_format("%s://%s", ngx.var.scheme, ngx.var.host)
         end,
         ["Host"] = function()
             real =  ngx.var.host

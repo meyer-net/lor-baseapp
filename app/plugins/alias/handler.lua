@@ -23,6 +23,9 @@ local s_gsub = string.gsub
 -----> 基础库引用
 local p_base = require("app.plugins.handler_adapter")
 
+-----> 工具库引用
+local u_request = require("app.utils.request")
+
 --------------------------------------------------------------------------
 
 --[[
@@ -57,15 +60,31 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
 
     local handle = rule.handle
     if handle and handle.alias then
+        local replaced = false
         local alias_uri = ngx_var.request_uri
         self.utils.each.array_action(conditions_matched, function ( _, condition )
+            local sub_str = condition.matched
+            if condition.matched ~= "/" and not self.utils.string.ends_with("/") then
+                sub_str = self.format("%s/", sub_str)
+            end
             if condition.type == "URI" then
-                local local_uri = s_gsub(alias_uri, condition.matched, "")
+                local local_uri = s_gsub(alias_uri, sub_str, "/")
 
                 -- 调整请求路径
                 alias_uri = self.format("/alias/%s", local_uri)
+
+                replaced = true
             end
         end)
+        
+        if not replaced then
+            alias_uri = self.format("/alias%s", ngx_var.request_uri)
+        end
+
+        local ext = u_request:get_ext_by_uri(alias_uri)
+        if not self.utils.object.check(ext) then
+            alias_uri = self.format("%s/index.html", alias_uri)
+        end
 
         local n_req = ngx.req
         local method = n_req.get_method()
@@ -73,6 +92,7 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
             n_req.read_body()
         end
         
+        ngx.header.content_type = u_request:get_content_type_by_ext(ext)
         local capture_method = ngx[self.format("HTTP_%s", method)]
         local res, err = ngx.location.capture(alias_uri, {
             method = capture_method,
@@ -82,7 +102,7 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
             }
         })
     
-        if res.status == ngx.HTTP_OK then
+        if res.status == ngx.HTTP_OK or res.status == ngx.HTTP_CREATED or res.status == ngx.HTTP_ACCEPTED then
             self:rule_log_info(rule, self.format("[%s-%s] Alias to: '%s' success, status: %s. host: %s, uri: %s", self._name, rule.name, handle.alias, res.status, ngx_var_host, ngx_var_uri))
         else
             self:rule_log_err(rule, self.format("[%s-%s] Alias to: '%s' error, status: %s, error: %s. host: %s, uri: %s", self._name, rule.name, handle.alias, res.status, err, ngx_var_host, ngx_var_uri))
@@ -90,6 +110,7 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
         
         ngx.status = res.status
         ngx.say(res.body)
+        ngx.exit(res.status)
     end
 end
 
