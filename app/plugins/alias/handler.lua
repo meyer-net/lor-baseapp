@@ -57,60 +57,33 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
     local ngx_var = ngx.var
     local ngx_var_host = ngx_var.host
     local ngx_var_uri = ngx_var.uri
-
+    
     local handle = rule.handle
     if handle and handle.alias then
-        local replaced = false
-        local alias_uri = ngx_var.request_uri
-        self.utils.each.array_action(conditions_matched, function ( _, condition )
-            local sub_str = condition.matched
-            if condition.matched ~= "/" and not self.utils.string.ends_with("/") then
-                sub_str = self.format("%s/", sub_str)
-            end
-            if condition.type == "URI" then
-                local local_uri = s_gsub(alias_uri, sub_str, "/")
-
-                -- 调整请求路径
-                alias_uri = self.format("/alias/%s", local_uri)
-
-                replaced = true
-            end
-        end)
-        
-        if not replaced then
-            alias_uri = self.format("/alias%s", ngx_var.request_uri)
+        local plugins_conf = self._conf.plugins_conf
+        if not plugins_conf then
+            self._log.err("[%s-%s] Can't find node of plugins_conf from sys.conf, nginx exit.", self._name, rule.name)
+            ngx.exit(-1)
         end
 
-        local ext = u_request:get_ext_by_uri(alias_uri)
-        if not self.utils.object.check(ext) then
-            alias_uri = self.format("%s/index.html", alias_uri)
+        local plugins_conf_alias = plugins_conf.alias
+        if not plugins_conf_alias then
+            self._log.err("[%s-%s] Can't find node of plugins_conf.alias from sys.conf, nginx exit.", self._name, rule.name)
+            ngx.exit(-1)
         end
 
-        local n_req = ngx.req
-        local method = n_req.get_method()
-        if (method ~= "GET") then
-            n_req.read_body()
+        local alias_server_port = plugins_conf_alias.port
+        local localhost = "127.0.0.1"
+        ngx_var.upstream_host = localhost
+        ngx_var.upstream_url = self.format("http://%s:%s", localhost, alias_server_port)
+        ngx.req.set_header("alias", handle.alias)
+
+        local ext = u_request:get_ext_by_uri(ngx_var.request_uri)
+        if self.utils.object.check(ext) then
+            ngx.header.content_type = u_request:get_content_type_by_ext(ext)
         end
         
-        ngx.header.content_type = u_request:get_content_type_by_ext(ext)
-        local capture_method = ngx[self.format("HTTP_%s", method)]
-        local res, err = ngx.location.capture(alias_uri, {
-            method = capture_method,
-            copy_all_vars = true,
-            vars = { 
-                alias = handle.alias
-            }
-        })
-    
-        if res.status == ngx.HTTP_OK or res.status == ngx.HTTP_CREATED or res.status == ngx.HTTP_ACCEPTED then
-            self:rule_log_info(rule, self.format("[%s-%s] Alias to: '%s' success, status: %s. host: %s, uri: %s", self._name, rule.name, handle.alias, res.status, ngx_var_host, ngx_var_uri))
-        else
-            self:rule_log_err(rule, self.format("[%s-%s] Alias to: '%s' error, status: %s, error: %s. host: %s, uri: %s", self._name, rule.name, handle.alias, res.status, err, ngx_var_host, ngx_var_uri))
-        end
-        
-        ngx.status = res.status
-        ngx.say(res.body)
-        ngx.exit(res.status)
+        self:rule_log_info(rule, self.format("[%s-%s] Alias to: '%s' success. host: %s, uri: %s", self._name, rule.name, handle.alias, ngx_var_host, ngx_var_uri))
     end
 end
 

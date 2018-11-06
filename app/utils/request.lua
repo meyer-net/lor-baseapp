@@ -460,6 +460,7 @@ function _obj:get_content_type_by_ext(ext)
         [".msi"] = "application/octet-stream", 
         [".msp"] = "application/octet-stream", 
         [".msm"] = "application/octet-stream", 
+        [".ipa"] = "application/octet-stream",
         [".mid"] = "audio/midi", 
         [".midi"] = "audio/midi", 
         [".kar"] = "audio/midi", 
@@ -483,7 +484,6 @@ function _obj:get_content_type_by_ext(ext)
         [".wmv"] = "video/x-ms-wmv", 
         [".avi"] = "video/x-msvideo", 
         [".apk"] = "application/vnd.android.package-archive",
-        [".ipa"] = "application/vnd.android.package-archive",
         [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
         [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
         [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation"

@@ -330,7 +330,7 @@ function handler:exec_action( rule_pass_func, rule_failure_func )
             else
                 selector_pass = self.utils.judge.judge_selector(selector, self._name)-- selector judge
             end
-
+            
             local rule_stop = false
             local is_log = selector.handle and selector.handle.log == true
             if selector_pass then
