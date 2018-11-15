@@ -54,7 +54,10 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
     local micro_handle = self:combine_micro_handle_by_rule(rule, variables) 
     local upstream_url = micro_handle.url
     if upstream_url then
-        ngx_var.upstream_host = micro_handle.host
+        if self.utils.object.check(micro_handle.host) then
+            ngx_var.upstream_host = micro_handle.host
+        end
+
         ngx_var.upstream_url = micro_handle.url
     else
         self:rule_log_err(rule, self.format("[%s-%s] no upstream host or url. host: %s, uri: %s", self._name, rule.name, ngx_var_host, ngx_var_uri))
