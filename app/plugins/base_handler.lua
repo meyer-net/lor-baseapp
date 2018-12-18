@@ -212,7 +212,7 @@ function handler:_rule_action(rule, pass_func, rule_failure_func)
                 self:rule_log_err(is_log, s_format("*****[%s-MATCH-RULE] %s*****: not contains [action], host: %s, uri: %s", self._name, rule.name, n_var.host, n_var.request_uri))
             end
         else
-            self:rule_log_info(is_log, s_format("*****[%s-NOT_MATCH-RULE]*****: host: %s, uri: %s", self._name, rule.name, n_var.request_uri))
+            self:rule_log_debug(is_log, s_format("*****[%s-NOT_MATCH-RULE]*****: host: %s, uri: %s", self._name, rule.name, n_var.host, n_var.request_uri))
         end
     end
 
@@ -223,7 +223,6 @@ end
 ---> 当前插件具备一定特殊性，重写父类规则
 --]]
 function handler:_stop_check(continue, check_passed)
-    -- ngx.log(ngx.ERR, self.format("%s|%s|%s|%s",rule.name,check_passed, self.utils.json.encode(rule_failure_func), self.utils.json.encode(rule.judge)))
     if type(continue) ~= "boolean" then
         local switch = {
             -- 匹配则略过后续规则
@@ -233,12 +232,13 @@ function handler:_stop_check(continue, check_passed)
         }
         
         local _switch_stop_check = switch[continue or 0]
+
         if _switch_stop_check then
             return _switch_stop_check()
         end
     end
-    
-    return check_passed or not continue --handler.super._stop_check(self, rule, check_passed)
+
+    return not continue --handler.super._stop_check(self, rule, check_passed)
 end
 
 --------------------------------------------------------------------------
@@ -291,17 +291,18 @@ end
 
 function handler:check_exec_rule( rules, rule_pass_func)
     local rule_stop = false
+    local rule_passed, conditions_matched = false
     self.utils.each.array_action(rules, function ( _, rule )
         -- 指示规则验证通过
-        local rule_passed, conditions_matched = self:_rule_action(rule, rule_pass_func)
+        rule_passed, conditions_matched = self:_rule_action(rule, rule_pass_func)
 
         rule_stop = self:_stop_check(rule.handle.continue, rule_passed) 
-        
+
         -- 匹配到插件 或 略过后续规则时跳出
         return not rule_stop -- 循环跳出，each接受false时才会跳出
     end)
 
-    return rule_stop
+    return rule_stop or rule_passed
 end
 
 function handler:exec_action( rule_pass_func, rule_failure_func )
@@ -320,7 +321,7 @@ function handler:exec_action( rule_pass_func, rule_failure_func )
     end
     
     self.utils.each.array_action(ordered_selectors, function ( i, sid )
-        self:rule_log_debug(is_log, s_format("[PASS THROUGH SELECTOR: %s]", sid))
+        self:rule_log_debug(is_log, s_format("[CHECK THROUGH SELECTOR: %s]", sid))
         local selector = selectors[sid]
         
         if selector and selector.enable == true then
@@ -334,16 +335,16 @@ function handler:exec_action( rule_pass_func, rule_failure_func )
             local rule_stop = false
             local is_log = selector.handle and selector.handle.log == true
             if selector_pass then
-                self:rule_log_info(is_log, s_format("[PASS-SELECTOR: %s] %s", sid, n_var.uri))
+                self:rule_log_info(is_log, s_format("[PASS-SELECTOR: %s(%s)] uri: %s", selector.name, sid, n_var.uri))
                 
                 local rules = ngx.ctx[s_format("_plugin_%s.selector.%s.rules", self._name, sid)]
-                          
+                
                 if rules and type(rules) == "table" and #rules > 0 then
-                    local rule_stop = self:check_exec_rule(rules, rule_pass_func)
-    
-                    if rule_stop then -- 不再执行此插件其他逻辑
-                        return false
-                    end
+
+                    rule_stop = self:check_exec_rule(rules, rule_pass_func)
+
+                    -- 不再执行此插件其他逻辑
+                    return not rule_stop
                 end
             else
                 self:rule_log_debug(is_log, s_format("[NOT-PASS-SELECTOR: %s] %s", sid, n_var.uri))

@@ -74,7 +74,7 @@ function handler:_rewrite_action(rule, variables, conditions_matched)
                 end
             end
 
-            ngx_set_uri(rewrite_uri, true)
+            ngx_set_uri(rewrite_uri, false)
         end
     end
 end
